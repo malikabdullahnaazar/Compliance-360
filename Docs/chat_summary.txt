@@ -1,0 +1,275 @@
+Nice project — this is actually a *serious, high-value healthcare AI system. I’ll give you a **clean developer-ready summary* you can hand directly to your dev team. No Fiverr/payment talk — only product + technical requirements.
+
+---
+
+# 🏥 *Compliance 360 – Hospice Clinical Chart Review System*
+
+## 🎯 *Project Goal*
+
+Build an *AI-powered web application* that reviews *hospice patient clinical charts (PDFs)* and automatically identifies *regulatory compliance deficiencies, with **citations to the applicable regulations*.
+
+The system should function like an *AI compliance auditor for hospice agencies*.
+
+---
+
+## 👥 *Target Users*
+
+* Hospice compliance reviewers
+* Clinical auditors
+* Hospice administrators
+
+*No complex role system required (for now)*
+Just secure login + user history.
+
+---
+
+## 🧠 *Core Functionality Overview*
+
+Users upload a *patient chart (PDF)* → AI reviews the document → System generates a *deficiency report* with *regulatory citations*.
+
+---
+
+# 🔁 *User Workflow*
+
+### 1️⃣ Login
+
+Simple authentication system
+
+* Email + Password
+* Secure sessions
+
+---
+
+### 2️⃣ Upload & Review Setup
+
+User selects:
+
+| Option                            | Description                               |
+| --------------------------------- | ----------------------------------------- |
+| *Upload PDF*                    | Upload full patient clinical chart        |
+| *Review Type*                   | Full Review OR Discipline-Specific Review |
+| *Discipline Filters (optional)* | Nursing, Social Work, Chaplain, etc.      |
+| *Accreditation Body*            | CHAP, Joint Commission, ACHC, HHSC        |
+| *CMS Regulations*               | Always included automatically             |
+
+Users *can select multiple accreditation bodies at once*.
+
+---
+
+### 3️⃣ AI Chart Analysis
+
+System must:
+
+✅ Extract text from uploaded PDFs
+✅ Analyze clinical documentation
+✅ Detect missing or insufficient documentation
+✅ Match findings against regulations
+✅ Generate deficiency statements
+✅ Cite the specific regulation for each issue
+
+---
+
+# 📋 *Types of Compliance Checks (Hospice-Specific)*
+
+The AI must understand:
+
+### 🩺 *Terminal Diagnosis Eligibility*
+
+Check if documentation supports terminal status:
+
+* Weight loss trends
+* Decline in ADLs
+* Falls
+* Incontinence
+* Cognitive decline
+* Hospitalizations
+* Other disease-specific decline indicators
+
+---
+
+### 📑 *Required Physician Documentation*
+
+* Physician certification of terminal illness
+* Orders for all disciplines
+* Face-to-face encounter documentation (when required)
+
+---
+
+### 👩‍⚕️ *Interdisciplinary Documentation*
+
+If services are provided, documentation must exist:
+
+| Discipline    | What Must Be Verified            |
+| ------------- | -------------------------------- |
+| Nursing       | Assessment, care plan, visits    |
+| Social Worker | Psychosocial assessment, visits  |
+| Chaplain      | Spiritual assessment if involved |
+| Aide          | Care notes & visit documentation |
+
+---
+
+### 🗂 *Plan of Care (POC) Compliance*
+
+* Initial plan of care present
+* Updates documented
+* Physician-signed
+* Services match orders
+
+---
+
+### 📉 *Clinical Decline Evidence*
+
+AI must confirm chart supports prognosis through documented decline over time.
+
+---
+
+# 📊 *Output Report Requirements*
+
+The system generates a *structured deficiency report*.
+
+Each deficiency must include:
+
+| Field                   | Description                      |
+| ----------------------- | -------------------------------- |
+| *Deficiency Title*    | Short issue name                 |
+| *Description*         | What is missing or non-compliant |
+| *Why It Matters*      | Clinical/regulatory risk         |
+| *Regulation Citation* | Specific regulatory reference    |
+| *Suggested Fix*       | What documentation is needed     |
+
+---
+
+### Example Output Format
+
+> *Deficiency:* Missing Physician Order for Social Work Visits
+> *Issue:* Social worker notes are present but no physician order found.
+> *Regulation:* CMS §418.56(c)
+> *Impact:* Services without orders are not reimbursable.
+> *Suggested Correction:* Add signed physician order for social work services.
+
+---
+
+# 🏛 *Regulatory Frameworks to Support*
+
+System must map deficiencies to:
+
+* *CMS Hospice Conditions of Participation (CoPs)* (always included)
+* *CHAP*
+* *Joint Commission*
+* *ACHC*
+* *HHSC (Texas Medicaid hospice regulations)*
+
+Users can select one or multiple.
+
+---
+
+# 🧩 *Technical Architecture*
+
+### 🔹 Frontend
+
+* Web-based (desktop + mobile responsive)
+* Upload interface
+* Framework selection UI
+* Results dashboard
+* Past report history
+
+*Suggested:* React / Next.js
+
+---
+
+### 🔹 Backend
+
+Handles:
+
+* Authentication
+* File uploads
+* AI processing
+* Regulation mapping
+* Report storage
+
+*Suggested:* Node.js (Express/Nest) or Django
+
+---
+
+### 🔹 AI Layer
+
+Must include:
+
+1. *PDF Text Extraction*
+
+   * OCR for scanned docs
+   * Structured text parsing
+
+2. *Prompt-Driven LLM Analysis*
+
+   * User already has structured prompts
+   * Prompts evaluate documentation against regulations
+
+3. *Regulation Knowledge Base*
+
+   * Store rules in structured format (JSON/DB)
+   * AI references these when generating citations
+
+---
+
+### 🔹 Database
+
+Store:
+
+* Users
+* Uploaded files
+* Review configurations
+* Generated reports
+* Regulation library
+
+*Suggested:* PostgreSQL
+
+---
+
+# 🛡 *Security & Compliance*
+
+Because this involves PHI:
+
+* Encrypted file storage
+* Secure HTTPS
+* Access controls
+* Automatic file deletion option (future feature)
+* Audit logs (future enhancement)
+
+---
+
+# 🚀 *Phase 1 Deliverables (MVP)*
+
+✅ Login system
+✅ PDF upload
+✅ Review type selection
+✅ Accreditation body selection
+✅ AI document analysis
+✅ Deficiency report with citations
+✅ Report history
+
+---
+
+# 🔮 Future Expansion (Not MVP but Plan Architecture For)
+
+* More healthcare sectors (home health, hospital, SNF)
+* API access for EHR systems
+* Team collaboration
+* Auto-correction guidance
+* Export to PDF/Word
+* Quality scoring system
+
+---
+
+# 💡 *Summary in One Line*
+
+> Upload hospice chart → AI audits documentation → System flags compliance failures with regulation citations.
+
+---
+
+If you want, next I can create:
+✅ Database schema
+✅ AI prompt structure
+✅ System architecture diagram
+
+Client wants an AI-powered web app for hospice clinical chart compliance review where users log in, upload a patient chart PDF, choose review type (full or discipline-specific), and select accreditation bodies (CMS always included plus CHAP, Joint Commission, ACHC, HHSC). The system should use AI to read the chart, detect missing or insufficient documentation (like lack of physician orders, unsupported terminal diagnosis, missing interdisciplinary notes, incomplete plan of care, or no proof of decline), and generate a structured deficiency report that explains the issue, why it’s non-compliant, cites the exact regulation, and suggests how to fix it. Multiple frameworks can be checked at once, no approval workflow is needed, and the software should store past reports, working as a secure, web-based compliance auditor for hospice agencies with future potential to expand into other healthcare areas.
