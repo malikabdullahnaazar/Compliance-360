@@ -53,6 +53,7 @@ const LoginForm = () => {
         id="password"
         label="Password"
         value={password}
+        placeholder="Enter your password"
         onChange={(event) => setPassword(event.target.value)}
         required
       />
