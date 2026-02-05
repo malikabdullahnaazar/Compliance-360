@@ -24,14 +24,21 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, []);
 
-    const login = async (username, password) => {
-        const data = await authService.login(username, password);
-        setUser(data.user); // Assuming the API returns user data on login
-        return data;
+    const login = async (email, password) => {
+        try {
+            const data = await authService.login(email, password);
+            if (data && data.user) {
+                setUser(data.user);
+            }
+            return data;
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
+        }
     };
 
-    const logout = () => {
-        authService.logout();
+    const logout = async () => {
+        await authService.logout();
         setUser(null);
     };
 

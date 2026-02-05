@@ -8,9 +8,11 @@ import {
   User,
   LayoutDashboard,
   LogIn,
+  LogOut,
   ShieldCheck,
 } from 'lucide-react';
 import { selectTheme, toggleTheme } from '../../store/slices/themeSlice';
+import { addToast } from '../../store/slices/uiSlice';
 import AuthContext from '../../context/AuthContext';
 import Button from '../ui/Button';
 import AppLogo from '../ui/AppLogo';
@@ -37,11 +39,21 @@ const Navbar = ({ variant = 'app' }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const mode = useSelector(selectTheme);
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
   const isLanding = variant === 'landing';
 
   const handleToggleTheme = () => {
     dispatch(toggleTheme());
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      dispatch(addToast({ type: 'success', message: 'Logged out successfully.' }));
+      navigate('/login');
+    } catch (error) {
+      dispatch(addToast({ type: 'error', message: 'Failed to logout.' }));
+    }
   };
 
   const containerClass = isLanding
@@ -103,6 +115,14 @@ const Navbar = ({ variant = 'app' }) => {
                 label="Profile"
                 onClick={() => user && navigate('/dashboard')}
               />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
+                aria-label="Logout"
+              >
+                <LogOut className="h-5 w-5" aria-hidden="true" />
+              </button>
             </>
           )}
           <Button

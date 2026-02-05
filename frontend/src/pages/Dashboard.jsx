@@ -1,21 +1,33 @@
 import { useContext } from 'react';
 import { useDispatch } from 'react-redux';
-import { Link } from 'react-router-dom';
-import { ShieldCheck, FileText, Clock3, Shield } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ShieldCheck, FileText, Clock3, Shield, LogOut } from 'lucide-react';
 import AppChrome from '../components/layout/AppChrome';
 import AuthContext from '../context/AuthContext';
+import { addToast } from '../store/slices/uiSlice';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const { user, logout } = useContext(AuthContext);
 
   const handleAdminAction = () => {
     dispatch({
       type: 'admin/performSensitiveExport',
       meta: { roles: ['admin'] },
     });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      dispatch(addToast({ type: 'success', message: 'Logged out successfully.' }));
+      navigate('/login');
+    } catch (error) {
+      dispatch(addToast({ type: 'error', message: 'Failed to logout.' }));
+    }
   };
 
   const stats = [
@@ -61,6 +73,16 @@ const Dashboard = () => {
               onClick={handleAdminAction}
             >
               Run admin test action
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="cursor-pointer inline-flex items-center gap-1.5"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Logout
             </Button>
           </div>
         </header>

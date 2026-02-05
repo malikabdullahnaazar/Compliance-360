@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { User2 } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { setLoading, addToast } from '../../store/slices/uiSlice';
 import AuthContext from '../../context/AuthContext';
 import TextInput from '../inputs/TextInput';
@@ -12,7 +12,7 @@ const LoginForm = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { login: authLogin } = useContext(AuthContext);
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -21,27 +21,32 @@ const LoginForm = () => {
     setError('');
     dispatch(setLoading({ isLoading: true, message: 'Authenticating...' }));
     try {
-      const data = await authLogin(username, password);
-      dispatch(setLoading({ isLoading: false, message: '' }));
-      dispatch(addToast({ type: 'success', message: 'Welcome back.' }));
-      navigate('/dashboard');
+      const data = await authLogin(email, password);
+      if (data && data.access) {
+        dispatch(setLoading({ isLoading: false, message: '' }));
+        dispatch(addToast({ type: 'success', message: 'Welcome back.' }));
+        navigate('/dashboard');
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (err) {
-      const message = 'Invalid credentials. Please try again.';
-      setError(message);
+      const errorMessage = err.response?.data?.detail || err.response?.data?.email?.[0] || err.message || 'Invalid credentials. Please try again.';
+      setError(errorMessage);
       dispatch(setLoading({ isLoading: false, message: '' }));
-      dispatch(addToast({ type: 'error', message }));
+      dispatch(addToast({ type: 'error', message: errorMessage }));
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <TextInput
-        id="username"
-        label="Username"
-        icon={User2}
-        placeholder="Enter your username"
-        value={username}
-        onChange={(event) => setUsername(event.target.value)}
+        id="email"
+        label="Email"
+        type="email"
+        icon={Mail}
+        placeholder="Enter your email"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
         required
       />
       <PasswordInput

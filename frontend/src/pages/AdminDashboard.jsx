@@ -1,8 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Users, Plus, ArrowLeft } from 'lucide-react';
-import AppChrome from '../components/layout/AppChrome';
 import AuthContext from '../context/AuthContext';
+import Sidebar from '../components/layout/Sidebar';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import { getAgencies, createAgency, getUsers } from '../services/admin.service';
@@ -15,6 +15,7 @@ const AdminDashboard = () => {
   const [creating, setCreating] = useState(false);
   const [newAgencyName, setNewAgencyName] = useState('');
   const [error, setError] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -63,8 +64,13 @@ const AdminDashboard = () => {
   }
 
   return (
-    <AppChrome>
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] dark:bg-black dark:text-gray-100">
+      <Sidebar onToggle={setSidebarCollapsed} />
+      <div
+        className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}
+        id="admin-content"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
         <header className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
@@ -231,7 +237,8 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
-    </AppChrome>
+      </div>
+    </div>
   );
 };
 
