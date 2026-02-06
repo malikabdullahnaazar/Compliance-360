@@ -10,7 +10,10 @@ import {
   LogIn,
   LogOut,
   ShieldCheck,
+  Home,
 } from 'lucide-react';
+import LogoutModal from '../common/LogoutModal';
+import { useState } from 'react';
 import { selectTheme, toggleTheme } from '../../store/slices/themeSlice';
 import { addToast } from '../../store/slices/uiSlice';
 import AuthContext from '../../context/AuthContext';
@@ -42,11 +45,17 @@ const Navbar = ({ variant = 'app' }) => {
   const { user, logout } = useContext(AuthContext);
   const isLanding = variant === 'landing';
 
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
   const handleToggleTheme = () => {
     dispatch(toggleTheme());
   };
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const alignConfirmLogout = async () => {
     try {
       await logout();
       dispatch(addToast({ type: 'success', message: 'Logged out successfully.' }));
@@ -54,11 +63,12 @@ const Navbar = ({ variant = 'app' }) => {
     } catch (error) {
       dispatch(addToast({ type: 'error', message: 'Failed to logout.' }));
     }
+    setIsLogoutModalOpen(false);
   };
 
   const containerClass = isLanding
     ? 'sticky top-0 left-0 right-0 z-50 bg-[#f9fafb]/90 dark:bg-slate-900/80 backdrop-blur-sm border-b border-gray-200/70 dark:border-slate-800'
-    : 'border-b border-gray-200 bg-white/80 dark:border-dark-border dark:bg-dark-card/80 backdrop-blur-sm';
+    : 'border-b border-gray-200 bg-white/80 dark:border-dark-border dark:bg-dark-card/80 backdrop-blur-sm h-20 flex items-center';
 
   const ctaButtonClass = isLanding
     ? 'bg-gradient-to-r from-[var(--primary-color-start)] to-[var(--primary-color-end)] hover:from-[var(--primary-hover-start)] hover:to-[var(--primary-hover-end)] text-white px-4 py-2 rounded-full text-sm font-medium transition-colors'
@@ -66,58 +76,24 @@ const Navbar = ({ variant = 'app' }) => {
 
   return (
     <header className={containerClass}>
-      <div className="mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8 max-w-7xl">
+      <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 max-w-7xl">
         <AppLogo />
         <nav className="flex items-center gap-1 md:gap-4" aria-label="Primary navigation">
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              `${navLinkBase} ${isActive ? 'text-[var(--primary-color)] dark:text-teal-400' : ''}`
-            }
-          >
-            Home
-          </NavLink>
-          {user ? (
-            <>
-              <NavLink
-                to="/dashboard"
-                className={({ isActive }) =>
-                  `${navLinkBase} ${isActive ? 'text-[var(--primary-color)] dark:text-teal-400' : ''}`
-                }
-              >
-                Dashboard
-              </NavLink>
-              {user.role === 'superadmin' && (
-                <NavLink
-                  to="/admin"
-                  className={({ isActive }) =>
-                    `${navLinkBase} inline-flex items-center gap-1.5 ${isActive ? 'text-[var(--primary-color)] dark:text-teal-400' : ''}`
-                  }
-                >
-                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                  Admin
-                </NavLink>
-              )}
-            </>
-          ) : (
-            <Link to="/login" className={`${navLinkBase} inline-flex items-center gap-1.5`}>
-              <LogIn className="h-4 w-4" aria-hidden="true" />
-              Sign In
-            </Link>
-          )}
+          {/* Middle navigation links removed as requested */}
         </nav>
         <div className="flex items-center gap-1">
           {user && (
             <>
-              <IconWithDot icon={Bell} label="Notifications" onClick={() => {}} />
-              <IconWithDot
-                icon={User}
-                label="Profile"
-                onClick={() => user && navigate('/dashboard')}
-              />
+              <Link
+                to="/"
+                className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
+                aria-label="Home"
+              >
+                <Home className="h-5 w-5" aria-hidden="true" />
+              </Link>
               <button
                 type="button"
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
                 className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
                 aria-label="Logout"
               >
@@ -171,6 +147,11 @@ const Navbar = ({ variant = 'app' }) => {
             ))}
         </div>
       </div>
+      <LogoutModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={alignConfirmLogout}
+      />
     </header>
   );
 };
