@@ -21,14 +21,17 @@ const Login = () => {
 
   return (
     <AppChrome>
-        <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-[var(--background)] px-4 py-8 dark:bg-black">
-          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-[var(--background)] px-4 py-8 dark:bg-black">
+        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-xl dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent dark:from-teal-400 dark:to-teal-500">
-              Compliance 360
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--primary-color-start)] to-[var(--primary-color-end)] text-white shadow-lg">
+              <span className="text-3xl font-bold">C</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Welcome back
             </h1>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">
-              Sign in to your account
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Sign in to access your compliance dashboard
             </p>
           </div>
           <LoginForm />

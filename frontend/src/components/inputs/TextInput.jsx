@@ -26,8 +26,8 @@ const TextInput = forwardRef(
         )}
         <div className="relative">
           {Icon && (
-            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-              <Icon className="h-4 w-4" aria-hidden="true" />
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 dark:text-gray-500">
+              <Icon className="h-5 w-5" aria-hidden="true" />
             </span>
           )}
           <input
@@ -35,11 +35,13 @@ const TextInput = forwardRef(
             ref={ref}
             type={type}
             className={cn(
-              'block w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm',
-              'focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500',
-              'dark:border-dark-border dark:bg-dark-card dark:text-slate-100',
-              Icon ? 'pl-9' : '',
-              error ? 'border-red-500 focus:ring-red-500' : '',
+              'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900',
+              'placeholder:text-gray-400',
+              'focus:border-[var(--primary-color)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-focus-ring)]',
+              'dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500',
+              'transition-colors duration-200',
+              Icon ? 'pl-10' : '',
+              error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '',
             )}
             {...props}
           />

@@ -6,14 +6,12 @@ import { getAgencies, getUsers } from '../services/admin.service';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar from '../components/layout/Navbar';
 import AuthContext from '../context/AuthContext';
-import { addToast } from '../store/slices/uiSlice';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [adminStats, setAdminStats] = useState({ agencies: 0, users: 0, activeUsers: 0 });
 
@@ -42,16 +40,6 @@ const Dashboard = () => {
       type: 'admin/performSensitiveExport',
       meta: { roles: ['admin'] },
     });
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      dispatch(addToast({ type: 'success', message: 'Logged out successfully.' }));
-      navigate('/login');
-    } catch (error) {
-      dispatch(addToast({ type: 'error', message: 'Failed to logout.' }));
-    }
   };
 
   const stats = [
@@ -151,11 +139,11 @@ const Dashboard = () => {
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
             {stats.map(({ label, value, sub, accent }) => (
-              <Card key={label} className="p-4 sm:p-6">
+              <Card key={label} className="p-5 sm:p-6">
                 <CardContent className="p-0">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</p>
-                  <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
-                  <p className={`mt-1 text-xs ${accent}`}>{sub}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+                  <p className="mt-3 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{value}</p>
+                  <p className={`mt-2 text-sm ${accent}`}>{sub}</p>
                 </CardContent>
               </Card>
             ))}
@@ -176,15 +164,15 @@ const Dashboard = () => {
                       <span className="font-medium">SOC 2</span>
                       <span>56 / 60 implemented</span>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-700">
-                      <div className="h-1.5 w-[93%] rounded-full bg-[var(--primary-color)]" />
+                    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                      <div className="h-full w-[93%] rounded-full bg-gradient-to-r from-[var(--primary-color-start)] to-[var(--primary-color-end)] animate-pulse" />
                     </div>
                     <div className="mt-3 flex items-center justify-between">
                       <span className="font-medium">ISO 27001</span>
                       <span>72 / 80 implemented</span>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-700">
-                      <div className="h-1.5 w-[90%] rounded-full bg-[var(--primary-color)]" />
+                    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                      <div className="h-full w-[90%] rounded-full bg-gradient-to-r from-[var(--primary-color-start)] to-[var(--primary-color-end)] animate-pulse" />
                     </div>
                   </div>
                 </CardContent>

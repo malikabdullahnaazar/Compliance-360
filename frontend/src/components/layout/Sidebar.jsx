@@ -41,7 +41,7 @@ const Sidebar = ({ onToggle }) => {
       await logout();
       dispatch(addToast({ type: 'success', message: 'Logged out successfully.' }));
       navigate('/login');
-    } catch (error) {
+    } catch {
       dispatch(addToast({ type: 'error', message: 'Failed to logout.' }));
     }
     setIsLogoutModalOpen(false);
@@ -81,7 +81,7 @@ const Sidebar = ({ onToggle }) => {
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'
+      className={`fixed left-0 top-0 z-40 h-screen bg-gradient-to-b from-teal-700 to-teal-800 dark:from-gray-900 dark:to-gray-800 border-r border-teal-600/50 dark:border-gray-700 shadow-2xl shadow-black/10 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'
         }`}
       aria-label="Sidebar"
     >

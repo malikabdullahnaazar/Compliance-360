@@ -11,10 +11,12 @@ const LoadingOverlay = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-      <div className="flex items-center gap-3 rounded-lg bg-white px-4 py-3 shadow-lg dark:bg-dark-card">
-        <Loader2 className="h-5 w-5 animate-spin text-primary-600" aria-hidden="true" />
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+      <div className="flex items-center gap-4 rounded-xl bg-white px-6 py-4 shadow-2xl dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+        <div className="relative">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--primary-color)]" aria-hidden="true" />
+        </div>
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
           {message || 'Loading...'}
         </p>
       </div>

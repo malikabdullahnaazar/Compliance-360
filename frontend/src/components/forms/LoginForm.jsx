@@ -38,13 +38,13 @@ const LoginForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <TextInput
         id="email"
-        label="Email"
+        label="Email address"
         type="email"
         icon={Mail}
-        placeholder="Enter your email"
+        placeholder="name@company.com"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         required
@@ -53,14 +53,14 @@ const LoginForm = () => {
         id="password"
         label="Password"
         value={password}
-        placeholder="Enter your password"
+        placeholder="••••••••"
         onChange={(event) => setPassword(event.target.value)}
         required
       />
       {error && (
-        <p className="text-sm font-medium text-red-600 dark:text-red-400">
-          {error}
-        </p>
+        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+          <p className="font-medium">{error}</p>
+        </div>
       )}
       <Button
         as="button"

@@ -20,24 +20,6 @@ import AuthContext from '../../context/AuthContext';
 import Button from '../ui/Button';
 import AppLogo from '../ui/AppLogo';
 
-const navLinkBase =
-  'relative px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:text-[var(--primary-color)] dark:hover:text-white cursor-pointer';
-
-const IconWithDot = ({ icon: Icon, label, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
-    aria-label={label}
-  >
-    <Icon className="h-5 w-5" aria-hidden="true" />
-    <span
-      className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[var(--primary-color)] ring-2 ring-white dark:ring-gray-900"
-      aria-hidden="true"
-    />
-  </button>
-);
-
 const Navbar = ({ variant = 'app' }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -60,19 +42,15 @@ const Navbar = ({ variant = 'app' }) => {
       await logout();
       dispatch(addToast({ type: 'success', message: 'Logged out successfully.' }));
       navigate('/login');
-    } catch (error) {
+    } catch {
       dispatch(addToast({ type: 'error', message: 'Failed to logout.' }));
     }
     setIsLogoutModalOpen(false);
   };
 
   const containerClass = isLanding
-    ? 'sticky top-0 left-0 right-0 z-50 bg-[#f9fafb]/90 dark:bg-slate-900/80 backdrop-blur-sm border-b border-gray-200/70 dark:border-slate-800'
-    : 'border-b border-gray-200 bg-white/80 dark:border-dark-border dark:bg-dark-card/80 backdrop-blur-sm h-20 flex items-center';
-
-  const ctaButtonClass = isLanding
-    ? 'bg-gradient-to-r from-[var(--primary-color-start)] to-[var(--primary-color-end)] hover:from-[var(--primary-hover-start)] hover:to-[var(--primary-hover-end)] text-white px-4 py-2 rounded-full text-sm font-medium transition-colors'
-    : '';
+    ? 'sticky top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800'
+    : 'border-b border-gray-200 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90 backdrop-blur-md h-16 flex items-center';
 
   return (
     <header className={containerClass}>
@@ -125,26 +103,18 @@ const Navbar = ({ variant = 'app' }) => {
               Dashboard
             </Button>
           )}
-          {!user &&
-            (isLanding ? (
-              <Link
-                to="/login"
-                className={`hidden sm:inline-flex items-center justify-center cursor-pointer ${ctaButtonClass}`}
-              >
-                Get Started
-              </Link>
-            ) : (
-              <Button
-                as={Link}
-                to="/login"
-                variant="primary"
-                size="sm"
-                className="hidden sm:inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <LogIn className="h-4 w-4" aria-hidden="true" />
-                Login
-              </Button>
-            ))}
+          {!user && (
+            <Button
+              as={Link}
+              to="/login"
+              variant="primary"
+              size="sm"
+              className="hidden sm:inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <LogIn className="h-4 w-4" aria-hidden="true" />
+              {isLanding ? 'Get Started' : 'Login'}
+            </Button>
+          )}
         </div>
       </div>
       <LogoutModal

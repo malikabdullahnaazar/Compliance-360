@@ -6,44 +6,44 @@ import Card from '../components/ui/Card';
 
 const HeroWave = () => (
   <svg
-    className="absolute bottom-0 left-0 w-full h-16 text-white dark:text-gray-900"
-    viewBox="0 0 1440 64"
+    className="absolute bottom-0 left-0 w-full h-20 text-gray-50 dark:text-gray-900"
+    viewBox="0 0 1440 80"
     fill="currentColor"
     preserveAspectRatio="none"
     aria-hidden="true"
   >
-    <path d="M0 64h1440V32C1200 0 960 0 720 32 480 64 240 64 0 32v32z" />
+    <path d="M0,80 L0,40 C240,80 480,80 720,40 C960,0 1200,0 1440,40 L1440,80 Z" />
   </svg>
 );
 
 const Home = () => (
   <AppChrome variant="landing">
-    <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
+    <section className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-teal-50/30 to-blue-50/50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-[10%] top-[20%] h-72 w-72 rounded-full bg-teal-400/20 blur-3xl dark:bg-teal-500/10" />
-        <div className="absolute right-[10%] top-[40%] h-96 w-96 rounded-full bg-teal-300/15 blur-3xl dark:bg-teal-600/10" />
-        <div className="absolute bottom-[20%] left-[40%] h-64 w-64 rounded-full bg-indigo-300/10 blur-3xl dark:bg-indigo-500/5" />
+        <div className="absolute left-[5%] top-[10%] h-96 w-96 rounded-full bg-teal-400/10 blur-3xl dark:bg-teal-500/5" />
+        <div className="absolute right-[5%] top-[20%] h-[500px] w-[500px] rounded-full bg-blue-400/10 blur-3xl dark:bg-blue-500/5" />
+        <div className="absolute bottom-[10%] left-[30%] h-80 w-80 rounded-full bg-teal-300/10 blur-3xl dark:bg-teal-400/5" />
       </div>
       <div className="relative mx-auto  px-4 pt-24 pb-20 sm:px-6 sm:pt-32 lg:px-8 lg:pb-28 lg:pt-40">
         <div className="mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center rounded-full bg-gradient-to-r from-teal-100 to-teal-200 px-4 py-1.5 text-sm font-medium text-teal-800 dark:from-teal-900/30 dark:to-teal-800/30 dark:text-teal-200">
+          <span className="inline-flex items-center rounded-full bg-teal-100 px-4 py-2 text-sm font-semibold text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
             Audit-ready in weeks, not months
           </span>
-          <h1 className="mt-6 text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl xl:text-7xl">
+          <h1 className="mt-8 text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl">
             <span className="block">Modern compliance</span>
             <span className="block bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent dark:from-teal-400 dark:to-teal-500">
               for regulated teams
             </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-600 dark:text-gray-300 sm:text-xl">
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-600 dark:text-gray-300 sm:text-xl leading-relaxed">
             Centralize policies, automate evidence collection, and surface real-time risk
             insights in a single, secure workspace designed for compliance leaders.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6">
-            <Button as={Link} to="/login" variant="primary" size="lg" className="cursor-pointer">
+            <Button as={Link} to="/login" variant="primary" size="lg">
               Get Started
             </Button>
-            <Button as={Link} to="/login" variant="outline" size="lg" className="cursor-pointer">
+            <Button as={Link} to="/login" variant="outline" size="lg" className="border-2">
               Sign In
             </Button>
           </div>
@@ -55,7 +55,7 @@ const Home = () => (
     <section className="bg-white dark:bg-gray-900 py-24 lg:py-32">
       <div className="mx-auto  px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <span className="inline-flex rounded-full bg-gradient-to-r from-teal-100 to-teal-200 px-4 py-1.5 text-sm font-medium text-teal-800 dark:from-teal-900/30 dark:to-teal-800/30 dark:text-teal-200">
+          <span className="inline-flex rounded-full bg-teal-100 px-4 py-1.5 text-sm font-semibold text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
             Platform capabilities
           </span>
           <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl lg:text-5xl">
@@ -66,7 +66,7 @@ const Home = () => (
             evidence, and audits.
           </p>
         </div>
-        <div className="mt-16 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[
             {
               icon: ShieldCheck,
@@ -86,25 +86,28 @@ const Home = () => (
               body:
                 'Generate board-ready reports and auditor exports in a few clicks, always backed by live data.',
             },
-          ].map(({ icon: Icon, title, body }) => (
+          ].map((feature) => {
+            const FeatureIcon = feature.icon;
+            return (
             <Card
-              key={title}
-              className="group relative overflow-hidden rounded-2xl p-6 hover:shadow-xl hover:shadow-teal-500/10 hover:-translate-y-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+              key={feature.title}
+              className="group relative overflow-hidden rounded-2xl p-8 hover:shadow-xl hover:-translate-y-1 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-teal-50 to-transparent dark:from-teal-900/20 dark:to-transparent opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-50/50 to-transparent dark:from-teal-900/10 dark:to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
               <div className="relative">
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 text-white">
-                  <Icon className="h-6 w-6" aria-hidden="true" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25">
+                  <FeatureIcon className="h-6 w-6" aria-hidden="true" />
                 </div>
-                <h3 className="mt-4 text-xl font-bold text-gray-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400">
-                  {title}
+                <h3 className="mt-5 text-xl font-bold text-gray-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                  {feature.title}
                 </h3>
-                <p className="mt-2 text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {body}
+                <p className="mt-3 text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {feature.body}
                 </p>
               </div>
             </Card>
-          ))}
+          );
+          })}
         </div>
       </div>
     </section>
@@ -118,14 +121,14 @@ const Home = () => (
           Join teams that ship audit-ready programs faster with Compliance 360.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6">
-          <Button as={Link} to="/login" variant="primary" size="lg" className="cursor-pointer bg-white/10 from-white/20 to-white/10 hover:from-white/30 hover:to-white/20 text-white border border-white/30">
+          <Button as={Link} to="/login" size="lg" className="bg-white text-teal-700 hover:bg-gray-50 border-0 shadow-xl hover:shadow-2xl hover:-translate-y-0.5">
             Start Free Trial
           </Button>
-          <Button as={Link} to="/login" variant="outline" size="lg" className="cursor-pointer border-2 border-white text-white hover:bg-white hover:text-teal-800">
+          <Button as={Link} to="/login" variant="outline" size="lg" className="border-2 border-white/80 text-white hover:bg-white/10 hover:border-white backdrop-blur-sm">
             View Pricing
           </Button>
         </div>
-        <p className="mt-6 text-sm text-teal-200">
+        <p className="mt-8 text-sm text-teal-200">
           No credit card required. SOC 2, ISO 27001, GDPR, HIPAA.
         </p>
       </div>
