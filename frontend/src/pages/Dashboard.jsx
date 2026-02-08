@@ -1,7 +1,8 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShieldCheck, FileText, Clock3, Shield, LogOut } from 'lucide-react';
+import { ShieldCheck, FileText, Clock3, Shield, LogOut, Building2, Users, ArrowRight } from 'lucide-react';
+import { getAgencies, getUsers } from '../services/admin.service';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar from '../components/layout/Navbar';
 import AuthContext from '../context/AuthContext';
@@ -14,6 +15,27 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useContext(AuthContext);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [adminStats, setAdminStats] = useState({ agencies: 0, users: 0, activeUsers: 0 });
+
+  useEffect(() => {
+    if (user?.role === 'superadmin') {
+      const fetchAdminStats = async () => {
+        try {
+          const [agenciesRes, usersRes] = await Promise.all([
+            getAgencies(),
+            getUsers(),
+          ]);
+          const agenciesCount = Array.isArray(agenciesRes) ? agenciesRes.length : 0;
+          const usersCount = Array.isArray(usersRes) ? usersRes.length : 0;
+          const activeCount = Array.isArray(usersRes) ? usersRes.filter(u => u.is_active).length : 0;
+          setAdminStats({ agencies: agenciesCount, users: usersCount, activeUsers: activeCount });
+        } catch (err) {
+          console.error('Failed to fetch admin stats', err);
+        }
+      };
+      fetchAdminStats();
+    }
+  }, [user]);
 
   const handleAdminAction = () => {
     dispatch({
@@ -44,7 +66,7 @@ const Dashboard = () => {
       <Sidebar onToggle={setSidebarCollapsed} />
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <Navbar variant="app" />
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+        <div className="mx-auto  px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
           <header className="mb-12 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
@@ -55,18 +77,7 @@ const Dashboard = () => {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              {user?.role === 'superadmin' && (
-                <Button
-                  as={Link}
-                  to="/admin"
-                  variant="outline"
-                  size="sm"
-                  className="cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Shield className="h-4 w-4" aria-hidden="true" />
-                  Super Admin
-                </Button>
-              )}
+              {/* Super Admin button removed as content is now integrated */}
               <Button type="button" variant="outline" size="sm" className="cursor-pointer">
                 Export snapshot
               </Button>
@@ -81,6 +92,62 @@ const Dashboard = () => {
               </Button>
             </div>
           </header>
+
+          {user?.role === 'superadmin' && (
+            <section className="mb-8 grid gap-6 md:grid-cols-2">
+              <Link to="/admin/agencies" className="block group">
+                <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-teal-200 dark:hover:border-teal-800">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                        <Building2 className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-teal-500 transform group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                      Manage Agencies
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Create and manage agency profiles and assignments
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {adminStats.agencies}
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">total agencies</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/admin/users" className="block group">
+                <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-800">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                        <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                      Manage Users
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      System users, role assignments, and access control
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {adminStats.users}
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        users ({adminStats.activeUsers} active)
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </section>
+          )}
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
             {stats.map(({ label, value, sub, accent }) => (

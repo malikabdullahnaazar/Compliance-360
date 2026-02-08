@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
+from rest_framework.decorators import action
 
 from .models import Agency, CustomUser
 from .permissions import IsSuperAdmin
@@ -64,16 +65,78 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 
+# Agency Views
 class AgencyListCreateView(generics.ListCreateAPIView):
     queryset = Agency.objects.all().order_by('-created_at')
     serializer_class = AgencySerializer
     permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
 
 
+class AgencyDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Agency.objects.all()
+    serializer_class = AgencySerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+
+
+# User Views
 class UserListView(generics.ListAPIView):
     queryset = CustomUser.objects.all().select_related('agency').order_by('-date_joined')
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+
+
+class UserCreateView(generics.CreateAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        password = request.data.get('password')
+        if not password:
+            # Generate a random password for the user if not provided
+            import random
+            import string
+            password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+        
+        # Pass password to serializer save method which will handle hashing
+        user = serializer.save(password=password)
+        
+        # TODO: Send email with password to user
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+
+
+class UserToggleStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+
+    def patch(self, request, pk):
+        try:
+            user = CustomUser.objects.get(pk=pk)
+        except CustomUser.DoesNotExist:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Don't allow deactivating superadmin
+        if user.role == 'superadmin':
+            return Response({'detail': 'Cannot deactivate superadmin users.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        is_active = request.data.get('is_active')
+        if is_active is not None:
+            user.is_active = is_active
+            user.save()
+            serializer = UserSerializer(user)
+            return Response(serializer.data)
+        
+        return Response({'detail': 'is_active field is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LogoutView(APIView):
@@ -81,3 +144,4 @@ class LogoutView(APIView):
 
     def post(self, request):
         return Response({'detail': 'Successfully logged out.'}, status=status.HTTP_200_OK)
+

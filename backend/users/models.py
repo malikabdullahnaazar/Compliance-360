@@ -28,6 +28,7 @@ class Agency(models.Model):
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('superadmin', 'Superadmin'),
+        ('admin', 'Admin'),
         ('qa_compliance', 'QA/Compliance'),
         ('clinical_leadership', 'Clinical Leadership'),
         ('clinician', 'Clinician'),

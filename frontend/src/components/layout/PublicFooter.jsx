@@ -8,7 +8,7 @@ const footerLinks = [
 
 const PublicFooter = () => (
   <footer className="bg-gray-900 text-gray-300">
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="mx-auto  px-4 py-12 sm:px-6 lg:px-8">
       <div className="flex flex-col items-center justify-between gap-6 border-t border-gray-800 pt-8 sm:flex-row">
         <p className="text-sm font-semibold bg-gradient-to-r from-teal-400 to-teal-500 bg-clip-text text-transparent">
           Compliance 360

@@ -76,7 +76,7 @@ const Navbar = ({ variant = 'app' }) => {
 
   return (
     <header className={containerClass}>
-      <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 max-w-7xl">
+      <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 ">
         <AppLogo />
         <nav className="flex items-center gap-1 md:gap-4" aria-label="Primary navigation">
           {/* Middle navigation links removed as requested */}

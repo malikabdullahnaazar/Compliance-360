@@ -24,7 +24,7 @@ const Home = () => (
         <div className="absolute right-[10%] top-[40%] h-96 w-96 rounded-full bg-teal-300/15 blur-3xl dark:bg-teal-600/10" />
         <div className="absolute bottom-[20%] left-[40%] h-64 w-64 rounded-full bg-indigo-300/10 blur-3xl dark:bg-indigo-500/5" />
       </div>
-      <div className="relative mx-auto max-w-7xl px-4 pt-24 pb-20 sm:px-6 sm:pt-32 lg:px-8 lg:pb-28 lg:pt-40">
+      <div className="relative mx-auto  px-4 pt-24 pb-20 sm:px-6 sm:pt-32 lg:px-8 lg:pb-28 lg:pt-40">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center rounded-full bg-gradient-to-r from-teal-100 to-teal-200 px-4 py-1.5 text-sm font-medium text-teal-800 dark:from-teal-900/30 dark:to-teal-800/30 dark:text-teal-200">
             Audit-ready in weeks, not months
@@ -53,7 +53,7 @@ const Home = () => (
     </section>
 
     <section className="bg-white dark:bg-gray-900 py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto  px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <span className="inline-flex rounded-full bg-gradient-to-r from-teal-100 to-teal-200 px-4 py-1.5 text-sm font-medium text-teal-800 dark:from-teal-900/30 dark:to-teal-800/30 dark:text-teal-200">
             Platform capabilities
@@ -110,7 +110,7 @@ const Home = () => (
     </section>
 
     <section className="bg-gradient-to-r from-teal-600 via-teal-700 to-teal-800 dark:from-teal-700 dark:via-teal-800 dark:to-teal-900 py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
+      <div className="mx-auto  px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
           Ready to simplify compliance?
         </h2>

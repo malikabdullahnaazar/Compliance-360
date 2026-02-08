@@ -4,7 +4,8 @@ import AuthContext, { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
+import AgenciesPage from './pages/AgenciesPage';
+import UsersPage from './pages/UsersPage';
 import GlobalUI from './components/feedback/GlobalUI';
 import './App.css';
 
@@ -53,10 +54,18 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/admin"
+        path="/admin/agencies"
         element={
           <SuperAdminRoute>
-            <AdminDashboard />
+            <AgenciesPage />
+          </SuperAdminRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <SuperAdminRoute>
+            <UsersPage />
           </SuperAdminRoute>
         }
       />
