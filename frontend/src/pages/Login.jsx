@@ -20,8 +20,8 @@ const Login = () => {
   }
 
   return (
-    <AppChrome>
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-[var(--background)] px-4 py-8 dark:bg-black">
+    <AppChrome variant="landing">
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-br from-gray-50 via-teal-50/30 to-blue-50/50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4 py-8">
         <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-xl dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--primary-color-start)] to-[var(--primary-color-end)] text-white shadow-lg">

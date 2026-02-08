@@ -81,7 +81,7 @@ const Sidebar = ({ onToggle }) => {
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 h-screen bg-gradient-to-b from-teal-700 to-teal-800 dark:from-gray-900 dark:to-gray-800 border-r border-teal-600/50 dark:border-gray-700 shadow-2xl shadow-black/10 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'
+      className={`fixed left-0 top-0 z-40 h-screen bg-white dark:bg-gradient-to-b dark:from-gray-900 dark:to-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-xl transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'
         }`}
       aria-label="Sidebar"
     >
@@ -117,14 +117,14 @@ const Sidebar = ({ onToggle }) => {
                 key={item.label}
                 to={href}
                 className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${active
-                  ? 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400'
+                  ? 'bg-gray-100 text-gray-900 dark:bg-teal-500/10 dark:text-teal-400'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
                   }`}
                 title={isCollapsed ? item.label : undefined}
               >
                 <Icon
                   className={`h-5 w-5 shrink-0 ${active
-                    ? 'text-teal-700 dark:text-teal-400'
+                    ? 'text-gray-900 dark:text-teal-400'
                     : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300'
                     }`}
                   aria-hidden="true"
