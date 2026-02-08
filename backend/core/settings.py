@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from datetime import timedelta
 
@@ -46,6 +47,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'users',
+    'ai',
 ]
 
 MIDDLEWARE = [
@@ -152,3 +154,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# AI Configuration
+AI_SETTINGS = {
+    'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY', ''),
+    'OPENAI_MODEL': os.getenv('OPENAI_MODEL', 'gpt-4o'),
+    'OPENAI_MAX_TOKENS': int(os.getenv('OPENAI_MAX_TOKENS', '4000')),
+    'OPENAI_TEMPERATURE': float(os.getenv('OPENAI_TEMPERATURE', '0.1')),
+    'MAX_DOCUMENT_SIZE_MB': int(os.getenv('AI_MAX_DOCUMENT_SIZE_MB', '50')),
+    'OCR_ENABLED': os.getenv('AI_OCR_ENABLED', 'true').lower() == 'true',
+    'DEFAULT_FRAMEWORKS': os.getenv('DEFAULT_FRAMEWORKS', 'CMS,CHAP').split(','),
+    'ENABLE_TEXAS_HHSC': os.getenv('ENABLE_TEXAS_HHSC', 'true').lower() == 'true',
+}
