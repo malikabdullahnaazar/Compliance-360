@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Agency, CustomUser
+from .models import CustomUser
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -50,10 +50,3 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', ''),
         )
         return user
-
-
-class AgencySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Agency
-        fields = ('id', 'name', 'slug', 'created_at')
-        read_only_fields = ('id', 'slug', 'created_at')

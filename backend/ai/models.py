@@ -91,29 +91,49 @@ class AuditDocument(models.Model):
         ('physician_orders', 'Physician Orders'),
         ('other', 'Other'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     audit_session = models.ForeignKey(
         AuditSession,
         on_delete=models.CASCADE,
-        related_name='documents'
+        related_name='documents',
+        null=True,
+        blank=True
     )
     
+    # Add direct patient reference for standalone documents
+    patient = models.ForeignKey(
+        'patients.Patient',
+        on_delete=models.CASCADE,
+        related_name='documents',
+        null=True,
+        blank=True
+    )
+    
+    # Associated agency (through patient or audit session)
+    agency = models.ForeignKey(
+        'agencies.Agency',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents'
+    )
+
     document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPES)
     filename = models.CharField(max_length=255)
     file_path = models.CharField(max_length=500)
     file_size_mb = models.FloatField()
     total_pages = models.IntegerField(null=True, blank=True)
-    
+
     # Extracted Content
     extracted_text = models.TextField()
     extraction_method = models.CharField(max_length=20, default='text')
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['document_type', 'filename']
-    
+
     def __str__(self):
         return f"{self.filename} ({self.document_type})"
 

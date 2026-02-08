@@ -4,11 +4,12 @@ AI App URLs
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import AuditSessionViewSet, ComplianceFindingViewSet, AIAuditAPIView
+from .views import AuditSessionViewSet, ComplianceFindingViewSet, AIAuditAPIView, DocumentManagementViewSet
 
 router = DefaultRouter()
 router.register(r'audit-sessions', AuditSessionViewSet, basename='audit-session')
 router.register(r'findings', ComplianceFindingViewSet, basename='finding')
+router.register(r'documents', DocumentManagementViewSet, basename='document')
 
 urlpatterns = [
     path('', include(router.urls)),

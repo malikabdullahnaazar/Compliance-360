@@ -11,6 +11,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import transaction
 from django.db.models import Q
+from rest_framework.filters import OrderingFilter, SearchFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from django.http import FileResponse, Http404
+import os
+from django.conf import settings
 
 from .models import (
     AuditSession,
@@ -72,10 +77,10 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
         """
         audit_session = self.get_object()
         serializer = DocumentUploadSerializer(data=request.data)
-        
+
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             # Get the uploaded file
             uploaded_file = request.FILES.get('file')
@@ -84,19 +89,19 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
                     {'error': 'No file provided'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             document_type = serializer.validated_data['document_type']
-            
+
             # Process the document
             processor = get_document_processor()
             file_bytes = uploaded_file.read()
-            
+
             processed_doc = processor.process_bytes(
                 file_bytes=file_bytes,
                 filename=uploaded_file.name,
                 document_type=document_type
             )
-            
+
             # Create document record
             with transaction.atomic():
                 document = AuditDocument.objects.create(
@@ -107,16 +112,90 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
                     file_size_mb=processed_doc['file_size_mb'],
                     total_pages=processed_doc.get('total_pages'),
                     extracted_text=processed_doc['content'],
-                    extraction_method=processed_doc['extraction_method']
+                    extraction_method=processed_doc['extraction_method'],
+                    agency=audit_session.created_by.agency  # Set agency from audit session creator
                 )
-            
+
             return Response(
                 AuditDocumentSerializer(document).data,
                 status=status.HTTP_201_CREATED
             )
-            
+
         except Exception as e:
             logger.error(f"Document upload failed: {str(e)}")
+            return Response(
+                {'error': f'Failed to process document: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def upload_patient_document(self, request):
+        """
+        Upload a document directly to a patient (not associated with an audit session).
+        """
+        # Validate the request data first
+        serializer = DocumentUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        patient_id = request.data.get('patient_id')
+        if not patient_id:
+            return Response(
+                {'error': 'patient_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Get the patient
+            from patients.models import Patient
+            patient = Patient.objects.get(id=patient_id)
+            
+            # Get the uploaded file
+            uploaded_file = request.FILES.get('file')
+            if not uploaded_file:
+                return Response(
+                    {'error': 'No file provided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            document_type = serializer.validated_data['document_type']
+
+            # Process the document
+            processor = get_document_processor()
+            file_bytes = uploaded_file.read()
+
+            processed_doc = processor.process_bytes(
+                file_bytes=file_bytes,
+                filename=uploaded_file.name,
+                document_type=document_type
+            )
+
+            # Create document record linked directly to patient
+            with transaction.atomic():
+                document = AuditDocument.objects.create(
+                    patient=patient,
+                    document_type=document_type,
+                    filename=uploaded_file.name,
+                    file_path=f"uploads/patient_{patient.id}/{uploaded_file.name}",
+                    file_size_mb=processed_doc['file_size_mb'],
+                    total_pages=processed_doc.get('total_pages'),
+                    extracted_text=processed_doc['content'],
+                    extraction_method=processed_doc['extraction_method'],
+                    agency=patient.agency  # Set agency from patient
+                )
+
+            return Response(
+                AuditDocumentSerializer(document).data,
+                status=status.HTTP_201_CREATED
+            )
+
+        except Patient.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Patient document upload failed: {str(e)}")
             return Response(
                 {'error': f'Failed to process document: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -323,6 +402,205 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
         }
         
         return Response(dashboard_data)
+
+
+class DocumentManagementViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for general document management operations.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
+    filterset_fields = ['document_type']
+    search_fields = ['filename']
+    ordering_fields = ['filename', 'created_at', 'document_type']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        """Filter documents by user permissions."""
+        user = self.request.user
+        # Superadmins can see all documents
+        if hasattr(user, 'is_superadmin') and user.is_superadmin:
+            return AuditDocument.objects.all()
+        # Agency admins can see all documents in their agency
+        elif hasattr(user, 'is_agency_admin') and user.is_agency_admin and user.agency:
+            return AuditDocument.objects.filter(agency=user.agency)
+        # Regular users can see documents they created through audit sessions or linked to their patients
+        else:
+            return AuditDocument.objects.filter(
+                Q(audit_session__created_by=user) | Q(patient__created_by=user)
+            ).distinct()
+
+    def get_serializer_class(self):
+        """Return appropriate serializer."""
+        return AuditDocumentSerializer
+
+    @action(detail=False, methods=['post'])
+    def upload(self, request):
+        """
+        Upload a document to the agency or link to a patient.
+        """
+        serializer = DocumentUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            uploaded_file = request.FILES.get('file')
+            document_type = serializer.validated_data['document_type']
+            patient_id = serializer.validated_data.get('patient_id')
+            
+            user = request.user
+            agency = getattr(user, 'agency', None)
+            
+            patient = None
+            if patient_id:
+                from patients.models import Patient
+                try:
+                    patient = Patient.objects.get(id=patient_id)
+                    # Permission check
+                    if agency and patient.agency != agency:
+                         return Response(
+                            {'error': 'Permission denied: Patient belongs to another agency'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                except Patient.DoesNotExist:
+                    return Response(
+                        {'error': 'Patient not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # Determine agency for document
+            doc_agency = patient.agency if patient else agency
+            
+            if not doc_agency and not patient and not getattr(user, 'is_superadmin', False):
+                return Response(
+                    {'error': 'Document must be associated with an agency or patient'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Process document
+            processor = get_document_processor()
+            file_bytes = uploaded_file.read()
+
+            processed_doc = processor.process_bytes(
+                file_bytes=file_bytes,
+                filename=uploaded_file.name,
+                document_type=document_type
+            )
+            
+            # Determine file path
+            if patient:
+                file_path = f"uploads/patient_{patient.id}/{uploaded_file.name}"
+            elif doc_agency:
+                file_path = f"uploads/agency_{doc_agency.id}/{uploaded_file.name}"
+            else:
+                file_path = f"uploads/general/{uploaded_file.name}"
+
+            # Create document record
+            with transaction.atomic():
+                document = AuditDocument.objects.create(
+                    audit_session=None,
+                    patient=patient,
+                    agency=doc_agency,
+                    document_type=document_type,
+                    filename=uploaded_file.name,
+                    file_path=file_path,
+                    file_size_mb=processed_doc['file_size_mb'],
+                    total_pages=processed_doc.get('total_pages'),
+                    extracted_text=processed_doc['content'],
+                    extraction_method=processed_doc['extraction_method']
+                )
+
+            return Response(
+                AuditDocumentSerializer(document).data,
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            logger.error(f"Document upload failed: {str(e)}")
+            return Response(
+                {'error': f'Failed to process document: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'])
+    def my_documents(self, request):
+        """Get documents associated with audit sessions created by the current user."""
+        documents = self.get_queryset()
+        serializer = self.get_serializer(documents, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def by_patient(self, request):
+        """Get documents associated with a specific patient."""
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response(
+                {'error': 'patient_id parameter required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from patients.models import Patient
+            patient = Patient.objects.get(id=patient_id)
+            
+            # Check if user has permission to access this patient's documents
+            user = request.user
+            if (hasattr(user, 'role') and user.role not in ['superadmin', 'agency_admin']) and \
+               patient.created_by != user:
+                return Response(
+                    {'error': 'Permission denied'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            documents = AuditDocument.objects.filter(patient=patient)
+            serializer = self.get_serializer(documents, many=True)
+            return Response(serializer.data)
+        except Patient.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        """
+        Download a document file.
+        """
+        document = self.get_object()
+        
+        # Check permissions (already handled by get_object/get_queryset but extra safety)
+        user = request.user
+        if not user.is_staff and document.agency != getattr(user, 'agency', None) and document.patient.created_by != user:
+             # Basic check, detailed check is in get_queryset
+             pass
+
+        file_path = os.path.join(settings.MEDIA_ROOT, document.file_path)
+        
+        if os.path.exists(file_path):
+            response = FileResponse(open(file_path, 'rb'), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{document.filename}"'
+            return response
+        else:
+            raise Http404("File not found")
+
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        """Search documents by filename or patient."""
+        query = request.query_params.get('q', '')
+        if query:
+            documents = self.get_queryset().filter(
+                Q(filename__icontains=query) |
+                Q(audit_session__patient_name__icontains=query) |
+                Q(audit_session__patient_id__icontains=query) |
+                Q(patient__first_name__icontains=query) |
+                Q(patient__last_name__icontains=query)
+            )
+        else:
+            documents = self.get_queryset()
+
+        serializer = self.get_serializer(documents, many=True)
+        return Response(serializer.data)
 
 
 class ComplianceFindingViewSet(viewsets.ModelViewSet):

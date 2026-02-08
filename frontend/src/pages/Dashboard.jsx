@@ -1,255 +1,439 @@
 import { useContext, useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
-import { ShieldCheck, FileText, Clock3, Shield, LogOut, Building2, Users, ArrowRight } from 'lucide-react';
-import { getAgencies, getUsers } from '../services/admin.service';
+import { Link } from 'react-router-dom';
+import {
+  ShieldCheck,
+  FileText,
+  Clock3,
+  Building2,
+  Users,
+  ArrowRight,
+  TrendingUp,
+  BarChart3,
+  Activity,
+  UserCheck,
+  Stethoscope,
+  UserPlus,
+  FileUp
+} from 'lucide-react';
+import { agencyService } from '../services/agency.service';
+import { patientService } from '../services/patient.service';
+import { documentService } from '../services/document.service';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar from '../components/layout/Navbar';
 import AuthContext from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
+import { addToast } from '../store/slices/uiSlice';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
   const { user } = useContext(AuthContext);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [adminStats, setAdminStats] = useState({ agencies: 0, users: 0, activeUsers: 0 });
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [recentPatients, setRecentPatients] = useState([]);
+  const [recentDocuments, setRecentDocuments] = useState([]);
+  const [timeRange, setTimeRange] = useState('30d');
 
   useEffect(() => {
-    if (user?.role === 'superadmin') {
-      const fetchAdminStats = async () => {
-        try {
-          const [agenciesRes, usersRes] = await Promise.all([
-            getAgencies(),
-            getUsers(),
-          ]);
-          const agenciesCount = Array.isArray(agenciesRes) ? agenciesRes.length : 0;
-          const usersCount = Array.isArray(usersRes) ? usersRes.length : 0;
-          const activeCount = Array.isArray(usersRes) ? usersRes.filter(u => u.is_active).length : 0;
-          setAdminStats({ agencies: agenciesCount, users: usersCount, activeUsers: activeCount });
-        } catch (err) {
-          console.error('Failed to fetch admin stats', err);
-        }
-      };
-      fetchAdminStats();
-    }
-  }, [user]);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        if (user?.role === 'superadmin') {
+          const analyticsRes = await agencyService.getAnalytics();
+          const data = analyticsRes.data;
 
-  const handleAdminAction = () => {
-    dispatch({
-      type: 'admin/performSensitiveExport',
-      meta: { roles: ['admin'] },
-    });
+          setAnalyticsData(data);
+          setAdminStats({
+            agencies: data.total_agencies,
+            users: data.total_users,
+            activeUsers: data.active_users
+          });
+        }
+        else if (user?.role === 'agency_admin') {
+          const [analyticsRes, patientsRes, documentsRes] = await Promise.allSettled([
+            agencyService.getAnalytics(),
+            patientService.getPatients(),
+            documentService.getDocuments()
+          ]);
+
+          if (analyticsRes.status === 'fulfilled') {
+            setAnalyticsData(analyticsRes.value.data);
+          }
+
+          if (patientsRes.status === 'fulfilled') {
+            const patientsList = Array.isArray(patientsRes.value.data?.results)
+              ? patientsRes.value.data.results
+              : Array.isArray(patientsRes.value.data) ? patientsRes.value.data : [];
+            setRecentPatients(patientsList.slice(0, 5));
+          }
+
+          if (documentsRes.status === 'fulfilled') {
+            const documentsList = Array.isArray(documentsRes.value.data?.results)
+              ? documentsRes.value.data.results
+              : Array.isArray(documentsRes.value.data) ? documentsRes.value.data : [];
+            setRecentDocuments(documentsList.slice(0, 5));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch dashboard data', err);
+        dispatch(addToast({ type: 'error', message: 'Failed to load some dashboard data' }));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, dispatch]);
+
+  const handleAction = (msg) => {
+    dispatch(addToast({ type: 'success', message: msg }));
   };
 
-  const stats = [
-    { label: 'Overall posture', value: '92%', sub: 'On track · +4% vs last week', accent: 'text-teal-600 dark:text-teal-400' },
-    { label: 'Controls complete', value: '128 / 140', sub: '12 remaining in progress', accent: 'text-gray-500' },
-    { label: 'Open risks', value: '6 high', sub: '14 medium · 9 low', accent: 'text-amber-600 dark:text-amber-400' },
-    { label: 'Next audit window', value: '23 days', sub: 'SOC 2 Type II', accent: 'text-gray-500' },
-  ];
+  const renderSuperAdminDashboard = () => (
+    <div className="space-y-8">
+      {/* Management Cards */}
+      <section className="grid gap-6 md:grid-cols-2">
+        <Link to="/admin/agencies" className="block group">
+          <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-teal-200 dark:hover:border-teal-800">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                  <Building2 className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-teal-500 transform group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                Manage Agencies
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Create and manage agency profiles and assignments
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {adminStats.agencies}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">total agencies</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/admin/users" className="block group">
+          <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-800">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                  <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                Manage Users
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                System users, role assignments, and access control
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {adminStats.users}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  users ({adminStats.activeUsers} active)
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </section>
+
+      {/* Integrated Analytics Summary */}
+      {analyticsData && (
+        <section className="space-y-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">System Analytics</h2>
+            <div className="flex gap-2">
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                className="text-sm border-gray-300 rounded-md dark:bg-gray-800 dark:border-gray-700"
+              >
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Patients</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{analyticsData.total_patients}</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                  <FileText className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Documents</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{analyticsData.total_documents}</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <ShieldCheck className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg Compliance</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{analyticsData.average_compliance_score}%</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center">
+                <div className="p-2 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
+                  <Activity className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Audits</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{analyticsData.total_audits}</p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="py-4 border-b dark:border-gray-800">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Agency Breakdown</h3>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 uppercase text-xs">
+                    <tr>
+                      <th className="px-6 py-3">Agency</th>
+                      <th className="px-6 py-3 text-center">Patients</th>
+                      <th className="px-6 py-3 text-center">Docs</th>
+                      <th className="px-6 py-3 text-center">Audits</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y dark:divide-gray-800">
+                    {analyticsData.agency_breakdown?.map((agency) => (
+                      <tr key={agency.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{agency.name}</td>
+                        <td className="px-6 py-4 text-center">{agency.patient_count}</td>
+                        <td className="px-6 py-4 text-center">{agency.document_count}</td>
+                        <td className="px-6 py-4 text-center">{agency.audit_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+    </div>
+  );
+
+  const renderAgencyAdminDashboard = () => (
+    <div className="space-y-8">
+      {/* Stats Cards */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="p-5">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">My Patients</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{analyticsData?.total_patients || 0}</p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Documents</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{analyticsData?.total_documents || 0}</p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Audit Sessions</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{analyticsData?.total_audits || 0}</p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Compliance score</p>
+          <p className="mt-2 text-3xl font-bold text-teal-600 dark:text-teal-400">{analyticsData?.average_compliance_score || 0}%</p>
+        </Card>
+      </section>
+
+      {/* Quick Actions */}
+      <section className="grid gap-6 md:grid-cols-2">
+        <Link to="/patients" className="block group">
+          <Card className="transition-all hover:shadow-md dark:hover:border-teal-800">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                  <Users className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white">Patients Management</h3>
+                  <p className="text-sm text-gray-500">View and add new patients</p>
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link to="/documents" className="block group">
+          <Card className="transition-all hover:shadow-md dark:hover:border-blue-800">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white">Document Compliance</h3>
+                  <p className="text-sm text-gray-500">Upload and audit documentation</p>
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
+            </CardContent>
+          </Card>
+        </Link>
+      </section>
+
+      {/* Recent Data Tables */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="py-4 border-b dark:border-gray-800">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Users className="h-4 w-4 text-teal-500" />
+              Recent Patients
+            </h3>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <tbody className="divide-y dark:divide-gray-800">
+                  {recentPatients.length > 0 ? recentPatients.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                      <td className="px-6 py-4 font-medium">{p.first_name} {p.last_name}</td>
+                      <td className="px-6 py-4 text-gray-500">{p.email}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Link to={`/patients/${p.id}`} className="text-teal-600 hover:underline">View</Link>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td className="px-6 py-8 text-center text-gray-500">No patients found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="py-4 border-b dark:border-gray-800">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-500" />
+              Recent Documents
+            </h3>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <tbody className="divide-y dark:divide-gray-800">
+                  {recentDocuments.length > 0 ? recentDocuments.map(d => (
+                    <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                      <td className="px-6 py-4 font-medium truncate max-w-[150px]">{d.filename}</td>
+                      <td className="px-6 py-4 text-gray-500">{d.document_type_display || d.document_type}</td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/30 rounded-full">Processed</span>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td className="px-6 py-8 text-center text-gray-500">No documents found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] dark:bg-black dark:text-gray-100">
-      <Sidebar onToggle={setSidebarCollapsed} />
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
-        <Navbar variant="app" />
-        <div className="mx-auto  px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
-          <header className="mb-12 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] dark:bg-gray-900 dark:text-gray-100">
+      <Sidebar
+        onToggle={setSidebarCollapsed}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-0 lg:ml-64'}`}>
+        <Navbar
+          variant="app"
+          onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        />
+        <div className="mx-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+          <header className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-                Compliance overview
+                {user?.role === 'superadmin' ? 'System Overview' : 'Agency Overview'}
               </h1>
               <p className="mt-2 text-lg text-gray-600 dark:text-gray-300">
-                Monitor control health, open risks, and upcoming audit milestones in one place.
+                {user?.role === 'superadmin'
+                  ? 'Monitor system performance, manage agencies, and oversee compliance across all organizations.'
+                  : `Monitor your agency's health, patients, and compliance status.`}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Super Admin button removed as content is now integrated */}
-              <Button type="button" variant="outline" size="sm" className="cursor-pointer">
-                Export snapshot
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                className="cursor-pointer"
-                onClick={handleAdminAction}
-              >
-                Run admin test action
-              </Button>
+            <div className="flex gap-3">
+              {user?.role === 'agency_admin' ? (
+                <>
+                  <Link to="/patients/new">
+                    <Button type="button" variant="primary" size="sm" className="cursor-pointer">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Patient
+                    </Button>
+                  </Link>
+                  <Link to="/documents/upload">
+                    <Button type="button" variant="outline" size="sm" className="cursor-pointer">
+                      <FileUp className="h-4 w-4 mr-2" />
+                      Upload Document
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  className="cursor-pointer"
+                  onClick={() => handleAction('System check initiated')}
+                >
+                  Run System Check
+                </Button>
+              )}
             </div>
           </header>
 
-          {user?.role === 'superadmin' && (
-            <section className="mb-8 grid gap-6 md:grid-cols-2">
-              <Link to="/admin/agencies" className="block group">
-                <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-teal-200 dark:hover:border-teal-800">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
-                        <Building2 className="h-6 w-6 text-teal-600 dark:text-teal-400" />
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-teal-500 transform group-hover:translate-x-1 transition-all" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-                      Manage Agencies
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                      Create and manage agency profiles and assignments
-                    </p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                        {adminStats.agencies}
-                      </span>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">total agencies</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-
-              <Link to="/admin/users" className="block group">
-                <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-800">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
-                        <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-                      Manage Users
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                      System users, role assignments, and access control
-                    </p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                        {adminStats.users}
-                      </span>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        users ({adminStats.activeUsers} active)
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </section>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <p className="text-gray-500">Loading overview...</p>
+            </div>
+          ) : user?.role === 'superadmin' ? (
+            renderSuperAdminDashboard()
+          ) : user?.role === 'agency_admin' ? (
+            renderAgencyAdminDashboard()
+          ) : (
+            <div className="p-8 text-center bg-gray-50 dark:bg-gray-800 rounded-xl">
+              <p className="text-gray-500">Access Restricted</p>
+            </div>
           )}
-
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-            {stats.map(({ label, value, sub, accent }) => (
-              <Card key={label} className="p-5 sm:p-6">
-                <CardContent className="p-0">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
-                  <p className="mt-3 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{value}</p>
-                  <p className={`mt-2 text-sm ${accent}`}>{sub}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </section>
-
-          <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr),minmax(0,1.4fr)]">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader className="py-4">
-                  <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                    <ShieldCheck className="h-4 w-4 text-teal-500" aria-hidden="true" />
-                    Control coverage by framework
-                  </h2>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">SOC 2</span>
-                      <span>56 / 60 implemented</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                      <div className="h-full w-[93%] rounded-full bg-gradient-to-r from-[var(--primary-color-start)] to-[var(--primary-color-end)] animate-pulse" />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="font-medium">ISO 27001</span>
-                      <span>72 / 80 implemented</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                      <div className="h-full w-[90%] rounded-full bg-gradient-to-r from-[var(--primary-color-start)] to-[var(--primary-color-end)] animate-pulse" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="py-4">
-                  <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                    <FileText className="h-4 w-4 text-teal-500" aria-hidden="true" />
-                    Open tasks
-                  </h2>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                    {[
-                      { title: 'Finalize access control policy', meta: 'Owner: Security · Due in 3 days', badge: 'High', badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-                      { title: 'Review vendor risk assessments', meta: 'Owner: Legal · Due in 6 days', badge: 'Medium', badgeClass: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' },
-                      { title: 'Refresh incident response playbooks', meta: 'Owner: Operations · Due in 10 days', badge: 'Low', badgeClass: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
-                    ].map(({ title, meta, badge, badgeClass }) => (
-                      <li
-                        key={title}
-                        className="flex items-start justify-between rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800/60"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{title}</p>
-                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{meta}</p>
-                        </div>
-                        <span className={`mt-0.5 rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass}`}>
-                          {badge}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-6">
-              <Card>
-                <CardHeader className="py-4">
-                  <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                    <Clock3 className="h-4 w-4 text-teal-500" aria-hidden="true" />
-                    Recent activity
-                  </h2>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <ol className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                    {[
-                      { text: 'Evidence approved for vulnerability management', meta: '12 minutes ago · by Alex Rivera', dot: 'bg-teal-500' },
-                      { text: 'New risk logged: third-party data processor', meta: '45 minutes ago · Assigned to Legal', dot: 'bg-[var(--primary-color)]' },
-                      { text: 'Control failed: MFA enrollment threshold', meta: '2 hours ago · Owner notified', dot: 'bg-amber-500' },
-                    ].map(({ text, meta, dot }) => (
-                      <li key={text} className="flex items-start gap-3">
-                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot}`} />
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{text}</p>
-                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{meta}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </CardContent>
-              </Card>
-
-              <Card className="border-dashed border-gray-300 dark:border-gray-600">
-                <CardContent className="p-4">
-                  <h2 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
-                    Admin sandbox
-                  </h2>
-                  <p className="text-xs text-gray-600 dark:text-gray-300">
-                    Use the <span className="font-semibold">Run admin test action</span> button above to
-                    validate role-based middleware and toast behavior without touching production data.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
         </div>
       </div>
     </div>

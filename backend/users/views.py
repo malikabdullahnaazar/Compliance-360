@@ -5,10 +5,12 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import Agency, CustomUser
+from .models import CustomUser
 from .permissions import IsSuperAdmin
-from .serializers import AgencySerializer, UserSerializer, RegisterSerializer
+from .serializers import UserSerializer, RegisterSerializer
 
 User = get_user_model()
 
@@ -65,24 +67,15 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 
-# Agency Views
-class AgencyListCreateView(generics.ListCreateAPIView):
-    queryset = Agency.objects.all().order_by('-created_at')
-    serializer_class = AgencySerializer
-    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
-
-
-class AgencyDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Agency.objects.all()
-    serializer_class = AgencySerializer
-    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
-
-
 # User Views
 class UserListView(generics.ListAPIView):
     queryset = CustomUser.objects.all().select_related('agency').order_by('-date_joined')
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['is_active', 'role', 'agency']
+    search_fields = ['username', 'email', 'first_name', 'last_name', 'agency__name']
+    ordering_fields = ['date_joined', 'username', 'email', 'role']
 
 
 class UserCreateView(generics.CreateAPIView):

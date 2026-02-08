@@ -1,19 +1,19 @@
 import api from './api';
 
 // Agency API calls
-export const getAgencies = () => api.get('admin/agencies/').then((r) => r.data);
+export const getAgencies = (params = {}) => api.get('agencies/agencies/', { params }).then((r) => r.data.results ? { results: r.data.results, count: r.data.count } : { results: Array.isArray(r.data) ? r.data : [], count: Array.isArray(r.data) ? r.data.length : 0 });
 
 export const createAgency = (data) =>
-  api.post('admin/agencies/', data).then((r) => r.data);
+  api.post('agencies/agencies/', data).then((r) => r.data);
 
 export const updateAgency = (id, data) =>
-  api.patch(`admin/agencies/${id}/`, data).then((r) => r.data);
+  api.patch(`agencies/agencies/${id}/`, data).then((r) => r.data);
 
 export const deleteAgency = (id) =>
-  api.delete(`admin/agencies/${id}/`).then((r) => r.data);
+  api.delete(`agencies/agencies/${id}/`).then((r) => r.data);
 
 // User API calls
-export const getUsers = () => api.get('admin/users/').then((r) => r.data);
+export const getUsers = (params = {}) => api.get('admin/users/', { params }).then((r) => r.data.results ? { results: r.data.results, count: r.data.count } : { results: Array.isArray(r.data) ? r.data : [], count: Array.isArray(r.data) ? r.data.length : 0 });
 
 export const createUser = (data) =>
   api.post('admin/users/create/', data).then((r) => r.data);
