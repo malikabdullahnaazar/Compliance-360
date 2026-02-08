@@ -49,7 +49,7 @@ const Navbar = ({ variant = 'app' }) => {
   };
 
   const containerClass = isLanding
-    ? 'sticky top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800'
+    ? 'sticky top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 h-16 flex items-center'
     : 'border-b border-gray-200 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90 backdrop-blur-md h-16 flex items-center';
 
   return (
