@@ -6,7 +6,15 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import AgenciesPage from './pages/AgenciesPage';
 import UsersPage from './pages/UsersPage';
+import AgencyDashboard from './pages/AgencyDashboard';
+import PatientsPage from './pages/PatientsPage';
+import NewPatientForm from './pages/NewPatientForm';
+import PatientDetailsPage from './pages/PatientDetailsPage';
+import DocumentsPage from './pages/DocumentsPage';
+import DocumentUploadPage from './pages/DocumentUploadPage';
+import AiAnalyzerPage from './pages/AiAnalyzerPage';
 import GlobalUI from './components/feedback/GlobalUI';
+import RoleBasedRoute from './components/common/RoleBasedRoute';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -14,30 +22,13 @@ const PrivateRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--background)] dark:bg-black">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)] dark:bg-gray-900">
         <p className="text-sm text-gray-500">Loading...</p>
       </div>
     );
   }
 
   return user ? children : <Navigate to="/login" replace />;
-};
-
-const SuperAdminRoute = ({ children }) => {
-  const { user, loading } = useContext(AuthContext);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--background)] dark:bg-black">
-        <p className="text-sm text-gray-500">Loading...</p>
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== 'superadmin') return <Navigate to="/dashboard" replace />;
-
-  return children;
 };
 
 function AppRoutes() {
@@ -56,17 +47,73 @@ function AppRoutes() {
       <Route
         path="/admin/agencies"
         element={
-          <SuperAdminRoute>
+          <RoleBasedRoute allowedRoles={['superadmin']} redirectTo="/dashboard">
             <AgenciesPage />
-          </SuperAdminRoute>
+          </RoleBasedRoute>
         }
       />
       <Route
         path="/admin/users"
         element={
-          <SuperAdminRoute>
+          <RoleBasedRoute allowedRoles={['superadmin']} redirectTo="/dashboard">
             <UsersPage />
-          </SuperAdminRoute>
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/agency-dashboard"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <AgencyDashboard />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/patients"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <PatientsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/patients/new"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <NewPatientForm />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/patients/:id"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <PatientDetailsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <DocumentsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/documents/upload"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <DocumentUploadPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/ai-analyzer"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <AiAnalyzerPage />
+          </RoleBasedRoute>
         }
       />
     </Routes>

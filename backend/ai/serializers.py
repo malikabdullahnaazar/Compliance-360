@@ -104,8 +104,13 @@ class AuditDocumentSerializer(serializers.ModelSerializer):
             'file_size_mb',
             'total_pages',
             'extraction_method',
-            'created_at'
+            'created_at',
+            'patient_first_name',
+            'patient_last_name'
         ]
+
+    patient_first_name = serializers.CharField(source='patient.first_name', read_only=True)
+    patient_last_name = serializers.CharField(source='patient.last_name', read_only=True)
 
 
 class RedFlagSerializer(serializers.ModelSerializer):
@@ -234,6 +239,7 @@ class DocumentUploadSerializer(serializers.Serializer):
     """Serializer for document upload."""
     document_type = serializers.ChoiceField(choices=AuditDocument.DOCUMENT_TYPES)
     file = serializers.FileField()
+    patient_id = serializers.CharField(required=False, allow_blank=True)
 
 
 class UpdateFindingSerializer(serializers.ModelSerializer):

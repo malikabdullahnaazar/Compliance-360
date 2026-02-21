@@ -11,6 +11,8 @@ import {
   LogOut,
   ShieldCheck,
   Home,
+  Menu,
+  X,
 } from 'lucide-react';
 import LogoutModal from '../common/LogoutModal';
 import { useState } from 'react';
@@ -20,7 +22,7 @@ import AuthContext from '../../context/AuthContext';
 import Button from '../ui/Button';
 import AppLogo from '../ui/AppLogo';
 
-const Navbar = ({ variant = 'app' }) => {
+const Navbar = ({ variant = 'app', onMenuToggle }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const mode = useSelector(selectTheme);
@@ -50,12 +52,23 @@ const Navbar = ({ variant = 'app' }) => {
 
   const containerClass = isLanding
     ? 'sticky top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 h-16 flex items-center'
-    : 'border-b border-gray-200 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90 backdrop-blur-md h-16 flex items-center';
+    : 'sticky top-0 left-0 right-0 z-50 border-b border-gray-200 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90 backdrop-blur-md h-16 flex items-center';
 
   return (
     <header className={containerClass}>
-      <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 ">
-        <AppLogo />
+      <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 ">
+        <div className="flex items-center gap-2">
+          {user && (
+            <button
+              onClick={onMenuToggle}
+              className="lg:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              aria-label="Toggle menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
+          <AppLogo />
+        </div>
         <nav className="flex items-center gap-1 md:gap-4" aria-label="Primary navigation">
           {/* Middle navigation links removed as requested */}
         </nav>
