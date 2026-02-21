@@ -13,6 +13,7 @@ import {
   FileText,
   TrendingUp,
   X,
+  Brain,
 } from 'lucide-react';
 import { addToast } from '../../store/slices/uiSlice';
 import AuthContext from '../../context/AuthContext';
@@ -87,6 +88,12 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       path: '/documents',
       roles: ['agency_admin'],
     },
+    {
+      icon: Brain,
+      label: 'AI Analyzer',
+      path: '/ai-analyzer',
+      roles: ['agency_admin'],
+    },
   ];
 
   const filteredMenuItems = menuItems.filter((item) => {
@@ -106,7 +113,7 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       if (['admin/agencies', 'admin/users', 'analytics', 'agency-dashboard'].includes(item.path.replace(/^\//, ''))) {
         return false;
       }
-      return ['/dashboard', '/patients', '/documents'].includes(item.path);
+      return ['/dashboard', '/patients', '/documents', '/ai-analyzer'].includes(item.path);
     }
     return user && item.roles.includes(user.role);
   });

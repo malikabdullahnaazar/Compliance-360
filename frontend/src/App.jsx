@@ -12,6 +12,7 @@ import NewPatientForm from './pages/NewPatientForm';
 import PatientDetailsPage from './pages/PatientDetailsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
+import AiAnalyzerPage from './pages/AiAnalyzerPage';
 import GlobalUI from './components/feedback/GlobalUI';
 import RoleBasedRoute from './components/common/RoleBasedRoute';
 import './App.css';
@@ -104,6 +105,14 @@ function AppRoutes() {
         element={
           <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
             <DocumentUploadPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/ai-analyzer"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <AiAnalyzerPage />
           </RoleBasedRoute>
         }
       />

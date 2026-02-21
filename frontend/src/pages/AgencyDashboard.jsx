@@ -14,7 +14,8 @@ import {
   FileUp,
   Stethoscope,
   Activity,
-  TrendingUp
+  TrendingUp,
+  Brain
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar from '../components/layout/Navbar';
@@ -133,7 +134,7 @@ const AgencyDashboard = () => {
           </section>
 
           {/* Quick Actions */}
-          <section className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <section className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-5">
             <Link to="/patients" className="block group">
               <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-teal-200 dark:hover:border-teal-800">
                 <CardContent className="p-6">
@@ -205,6 +206,25 @@ const AgencyDashboard = () => {
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     View compliance trends and insights
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to="/ai-analyzer" className="block group">
+              <Card className="h-full transition-all duration-200 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                      <Brain className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-indigo-500 transform group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                    AI Analyzer
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Analyze patient documents using AI
                   </p>
                 </CardContent>
               </Card>

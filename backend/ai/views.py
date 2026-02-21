@@ -16,6 +16,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.http import FileResponse, Http404
 import os
 from django.conf import settings
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 from .models import (
     AuditSession,
@@ -24,7 +26,8 @@ from .models import (
     RegulatoryCitation,
     CorrectionGuidance,
     RedFlag,
-    AuditRecommendation
+    AuditRecommendation,
+    AIAnalysisResult,
 )
 from .serializers import (
     AuditSessionListSerializer,
@@ -102,13 +105,16 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
                 document_type=document_type
             )
 
+            file_path = f"uploads/{audit_session.id}/{uploaded_file.name}"
+            saved_file_path = default_storage.save(file_path, ContentFile(file_bytes))
+
             # Create document record
             with transaction.atomic():
                 document = AuditDocument.objects.create(
                     audit_session=audit_session,
                     document_type=document_type,
                     filename=uploaded_file.name,
-                    file_path=f"uploads/{audit_session.id}/{uploaded_file.name}",
+                    file_path=saved_file_path,
                     file_size_mb=processed_doc['file_size_mb'],
                     total_pages=processed_doc.get('total_pages'),
                     extracted_text=processed_doc['content'],
@@ -170,13 +176,16 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
                 document_type=document_type
             )
 
+            file_path = f"uploads/patient_{patient.id}/{uploaded_file.name}"
+            saved_file_path = default_storage.save(file_path, ContentFile(file_bytes))
+
             # Create document record linked directly to patient
             with transaction.atomic():
                 document = AuditDocument.objects.create(
                     patient=patient,
                     document_type=document_type,
                     filename=uploaded_file.name,
-                    file_path=f"uploads/patient_{patient.id}/{uploaded_file.name}",
+                    file_path=saved_file_path,
                     file_size_mb=processed_doc['file_size_mb'],
                     total_pages=processed_doc.get('total_pages'),
                     extracted_text=processed_doc['content'],
@@ -496,6 +505,8 @@ class DocumentManagementViewSet(viewsets.ModelViewSet):
             else:
                 file_path = f"uploads/general/{uploaded_file.name}"
 
+            saved_file_path = default_storage.save(file_path, ContentFile(file_bytes))
+
             # Create document record
             with transaction.atomic():
                 document = AuditDocument.objects.create(
@@ -504,7 +515,7 @@ class DocumentManagementViewSet(viewsets.ModelViewSet):
                     agency=doc_agency,
                     document_type=document_type,
                     filename=uploaded_file.name,
-                    file_path=file_path,
+                    file_path=saved_file_path,
                     file_size_mb=processed_doc['file_size_mb'],
                     total_pages=processed_doc.get('total_pages'),
                     extracted_text=processed_doc['content'],
@@ -768,3 +779,143 @@ class AIAuditAPIView(viewsets.ViewSet):
                 {'error': f'Failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class MistralAnalyzeView(viewsets.ViewSet):
+    """
+    Mistral AI analysis endpoints.
+    POST /api/ai/mistral/analyze/   – analyze selected docs, return Markdown
+    POST /api/ai/mistral/save/      – save a result to the DB
+    GET  /api/ai/mistral/results/   – list saved results (optionally ?patient_id=)
+    """
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['post'], url_path='analyze')
+    def analyze(self, request):
+        """
+        Accepts: { patient_id: str, document_ids: [str, ...] }
+        Returns: { report_markdown: str, patient_info: {...}, document_names: [...] }
+        """
+        from .services.mistral_service import get_mistral_service
+        from patients.models import Patient
+
+        patient_id = request.data.get('patient_id')
+        document_ids = request.data.get('document_ids', [])
+
+        if not patient_id:
+            return Response({'error': 'patient_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not document_ids:
+            return Response({'error': 'document_ids list is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            patient = Patient.objects.get(id=patient_id)
+        except Patient.DoesNotExist:
+            return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Fetch documents
+        documents_qs = AuditDocument.objects.filter(id__in=document_ids, patient=patient)
+        if not documents_qs.exists():
+            return Response({'error': 'No matching documents found for this patient'}, status=status.HTTP_400_BAD_REQUEST)
+
+        patient_info = {
+            'patient_id': str(patient.id),
+            'first_name': patient.first_name,
+            'last_name': patient.last_name,
+        }
+
+        documents_data = [
+            {
+                'filename': doc.filename,
+                'document_type': doc.document_type,
+                'document_type_display': doc.get_document_type_display(),
+                'extracted_text': doc.extracted_text or '[No text extracted]',
+            }
+            for doc in documents_qs
+        ]
+
+        try:
+            service = get_mistral_service()
+            report_markdown = service.analyze_documents(
+                documents=documents_data,
+                patient_info=patient_info,
+            )
+        except Exception as exc:
+            logger.error(f'Mistral analysis failed: {exc}')
+            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'report_markdown': report_markdown,
+            'patient_info': patient_info,
+            'document_names': [d['filename'] for d in documents_data],
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='save')
+    def save_result(self, request):
+        """
+        Accepts: { patient_id, report_markdown, document_names, ai_model_used }
+        Saves an AIAnalysisResult record and returns its id.
+        """
+        from patients.models import Patient
+
+        patient_id = request.data.get('patient_id')
+        report_markdown = request.data.get('report_markdown', '').strip()
+        document_names = request.data.get('document_names', [])
+        ai_model = request.data.get('ai_model_used', 'open-mistral-nemo')
+
+        if not patient_id or not report_markdown:
+            return Response({'error': 'patient_id and report_markdown are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            patient = Patient.objects.get(id=patient_id)
+        except Patient.DoesNotExist:
+            return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        result = AIAnalysisResult.objects.create(
+            patient=patient,
+            created_by=request.user,
+            analyzed_document_names=document_names,
+            report_markdown=report_markdown,
+            ai_model_used=ai_model,
+        )
+
+        return Response({
+            'id': str(result.id),
+            'created_at': result.created_at.isoformat(),
+            'message': 'Result saved successfully',
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='results')
+    def list_results(self, request):
+        """
+        GET /api/ai/mistral/results/?patient_id=<uuid>
+        Returns all saved AI analysis results for a patient.
+        """
+        patient_id = request.query_params.get('patient_id')
+        qs = AIAnalysisResult.objects.select_related('patient', 'created_by')
+
+        user = request.user
+        if hasattr(user, 'is_superadmin') and user.is_superadmin:
+            pass  # see all
+        elif hasattr(user, 'agency') and user.agency:
+            qs = qs.filter(patient__agency=user.agency)
+        else:
+            qs = qs.filter(patient__created_by=user)
+
+        if patient_id:
+            qs = qs.filter(patient_id=patient_id)
+
+        data = [
+            {
+                'id': str(r.id),
+                'patient_id': str(r.patient_id),
+                'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
+                'report_markdown': r.report_markdown,
+                'analyzed_document_names': r.analyzed_document_names,
+                'ai_model_used': r.ai_model_used,
+                'created_at': r.created_at.isoformat(),
+                'created_by': r.created_by.get_full_name() if r.created_by else None,
+            }
+            for r in qs
+        ]
+
+        return Response(data, status=status.HTTP_200_OK)
