@@ -26,7 +26,7 @@ class Patient(models.Model):
 
     # Basic Information
     first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True, null=True)
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES)
     phone = models.CharField(max_length=20)

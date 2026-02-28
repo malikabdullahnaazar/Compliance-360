@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Brain, FileText, X, Save, ChevronDown, AlertTriangle,
     Search, ChevronUp, Calendar, Cpu, FileStack, Users, ChevronLeft, ChevronRight, CheckCircle, XCircle,
-    UserCheck, ClipboardList
+    UserCheck, ClipboardList, Clock, FileCheck, ExternalLink
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -407,6 +408,8 @@ const MarkdownReport = ({ markdown }) => (
 /* ─── Main Page ───────────────────────────────────────────────────────────── */
 const AiAnalyzerPage = () => {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('analyze');
@@ -440,6 +443,20 @@ const AiAnalyzerPage = () => {
     const [assigning, setAssigning] = useState(false);
 
     useEffect(() => { fetchPatients(); loadClinicians(); }, []);
+
+    // Restore tab + patient filter when navigating back from the report detail page
+    useEffect(() => {
+        const state = location.state;
+        if (state?.tab) {
+            setActiveTab(state.tab);
+        }
+        if (state?.patientId) {
+            setResultPatient(state.patientId);
+            setExpandedResultPatient(state.patientId);
+        }
+        // Clear the state so a manual refresh doesn't re-apply it
+        window.history.replaceState({}, '');
+    }, []);
 
     useEffect(() => {
         if (activeTab === 'result' || activeTab === 'passed') loadSavedResults();
@@ -564,9 +581,9 @@ const AiAnalyzerPage = () => {
             let status = 'Fail'; // default
 
             // 1. Parse "Total Findings: N" from the Executive Summary line
-            //    Matches: "Total Findings: 0 | Critical: 0 | ..."
+            //    Matches: "Total Findings: 0 | Critical: 0 | ..." (and ignores asterisks)
             const findingsMatch = report_markdown.match(
-                /Total\s+Findings\s*:\s*(\d+)/i
+                /Total\s+Findings\D*(\d+)/i
             );
             if (findingsMatch) {
                 const totalFindings = parseInt(findingsMatch[1], 10);
@@ -864,8 +881,8 @@ const AiAnalyzerPage = () => {
                                                 <div className="space-y-4">
                                                     {(groupedData[resultPatient]?.results || []).map((result) => (
                                                         <Card key={result.id} className="border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-                                                            <div className="px-5 py-4 flex items-start justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                                                                <button type="button" className="flex-1 text-left flex items-start gap-4 min-w-0" onClick={() => setExpandedResult(expandedResult === result.id ? null : result.id)}>
+                                                            <div className="px-5 py-4 flex items-start justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer" onClick={() => navigate(`/ai-analyzer/report/${result.id}`, { state: { patientId: result.patient_id } })}>
+                                                                <div className="flex-1 text-left flex items-start gap-4 min-w-0">
                                                                     <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${result.status === 'Pass' ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'}`}>
                                                                         {result.status === 'Pass' ? <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" /> : <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />}
                                                                     </div>
@@ -896,8 +913,21 @@ const AiAnalyzerPage = () => {
                                                                             </p>
                                                                         )}
                                                                     </div>
-                                                                </button>
-                                                                <div className="flex items-center gap-2 flex-shrink-0 mt-1">
+                                                                </div>
+                                                                <div className="flex items-center gap-2 flex-shrink-0 mt-1" onClick={e => e.stopPropagation()}>
+                                                                    {/* Document Pending/Submitted status */}
+                                                                    {result.status !== 'Pass' && (
+                                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border
+                                                                            ${result.clinician_document_status === 'submitted'
+                                                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                                                                : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                                                            }`}>
+                                                                            {result.clinician_document_status === 'submitted'
+                                                                                ? <><FileCheck className="h-3 w-3" /> Doc Submitted</>
+                                                                                : <><Clock className="h-3 w-3" /> Doc Pending</>
+                                                                            }
+                                                                        </span>
+                                                                    )}
                                                                     {result.status !== 'Pass' && (
                                                                         <button
                                                                             type="button"
@@ -916,17 +946,12 @@ const AiAnalyzerPage = () => {
                                                                             {result.is_assigned ? "Assigned" : "Assign"}
                                                                         </button>
                                                                     )}
-                                                                    <ChevronDown
-                                                                        onClick={() => setExpandedResult(expandedResult === result.id ? null : result.id)}
-                                                                        className={`h-5 w-5 text-gray-400 flex-shrink-0 transition-transform cursor-pointer ${expandedResult === result.id ? 'rotate-180' : ''}`}
+                                                                    <ExternalLink
+                                                                        className="h-4 w-4 text-gray-400 flex-shrink-0"
+                                                                        title="Open full report"
                                                                     />
                                                                 </div>
                                                             </div>
-                                                            {expandedResult === result.id && (
-                                                                <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-6 bg-gray-50/50 dark:bg-gray-800/20">
-                                                                    <MarkdownReport markdown={result.report_markdown} />
-                                                                </div>
-                                                            )}
                                                         </Card>
                                                     ))}
                                                 </div>

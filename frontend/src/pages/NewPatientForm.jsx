@@ -69,10 +69,6 @@ const NewPatientForm = () => {
       newErrors.firstName = 'First name is required';
     }
 
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
-
     if (!formData.dob) {
       newErrors.dob = 'Date of birth is required';
     }
@@ -215,7 +211,7 @@ const NewPatientForm = () => {
 
                     <div>
                       <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Last Name <span className="required-asterisk">*</span>
+                        Last Name
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

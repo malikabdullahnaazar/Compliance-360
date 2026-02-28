@@ -856,6 +856,13 @@ class MistralAnalyzeView(viewsets.ViewSet):
                 re.IGNORECASE
             )
             report_markdown = date_pattern.sub(current_date_str, report_markdown)
+            
+            # Replace ISO timestamp placeholders specifically
+            iso_pattern = re.compile(
+                r'\[(?:ISO timestamp|Current ISO timestamp)\]',
+                re.IGNORECASE
+            )
+            report_markdown = iso_pattern.sub(datetime.now().isoformat(), report_markdown)
 
             # Post-process: make document names clickable links.
             # Use re.sub with a negative lookbehind on '](' to avoid re-replacing
@@ -908,7 +915,7 @@ class MistralAnalyzeView(viewsets.ViewSet):
         # Always derive status from the report content so frontend logic drifts
         # or bugs don't cause incorrect stored statuses.
         import re as _re
-        findings_match = _re.search(r'Total\s+Findings\s*:\s*(\d+)', report_markdown, _re.IGNORECASE)
+        findings_match = _re.search(r'Total\s+Findings\D*(\d+)', report_markdown, _re.IGNORECASE)
         if findings_match:
             total_findings = int(findings_match.group(1))
             status_val = 'Pass' if total_findings == 0 else 'Fail'
@@ -962,23 +969,200 @@ class MistralAnalyzeView(viewsets.ViewSet):
         if patient_id:
             qs = qs.filter(patient_id=patient_id)
 
-        data = [
-            {
+        data = []
+        for r in qs:
+            # Fetch analyzed document records so the frontend can View/Download them
+            analyzed_docs = AuditDocument.objects.filter(
+                patient=r.patient,
+                filename__in=r.analyzed_document_names
+            ).values('id', 'filename', 'document_type', 'file_size_mb')
+            analyzed_documents_info = [
+                {
+                    'id': str(d['id']),
+                    'filename': d['filename'],
+                    'document_type': d['document_type'],
+                    'file_size_mb': round(d['file_size_mb'], 2),
+                }
+                for d in analyzed_docs
+            ]
+
+            # Clinician doc comes from the AssignedAuditReport's uploaded_document
+            assignment_with_doc = AssignedAuditReport.objects.filter(
+                analysis_result=r,
+                uploaded_document__isnull=False
+            ).exclude(uploaded_document='').first()
+
+            if assignment_with_doc:
+                clinician_doc_status = 'submitted'
+                clinician_doc_name = assignment_with_doc.uploaded_document_name
+                has_clinician_doc = True
+                clinician_doc_submitted_at = assignment_with_doc.completed_at.isoformat() if assignment_with_doc.completed_at else None
+                clinician_assignment_id = str(assignment_with_doc.id)
+            else:
+                clinician_doc_status = 'pending'
+                clinician_doc_name = ''
+                has_clinician_doc = False
+                clinician_doc_submitted_at = None
+                clinician_assignment_id = None
+
+            data.append({
                 'id': str(r.id),
                 'patient_id': str(r.patient_id),
                 'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
                 'report_markdown': r.report_markdown,
                 'analyzed_document_names': r.analyzed_document_names,
+                'analyzed_documents': analyzed_documents_info,
                 'ai_model_used': r.ai_model_used,
                 'status': r.status,
                 'created_at': r.created_at.isoformat(),
                 'created_by': r.created_by.get_full_name() if r.created_by else None,
                 'is_assigned': getattr(r, 'is_assigned', False),
-            }
-            for r in qs
-        ]
+                'clinician_document_status': clinician_doc_status,
+                'clinician_document_name': clinician_doc_name,
+                'has_clinician_document': has_clinician_doc,
+                'clinician_document_submitted_at': clinician_doc_submitted_at,
+                'clinician_assignment_id': clinician_assignment_id,
+            })
 
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='results/(?P<result_id>[^/.]+)/detail')
+    def get_result_detail(self, request, result_id=None):
+        """
+        GET /api/ai/mistral/results/<result_id>/detail/
+        Returns a single saved AI analysis result with full details.
+        """
+        from django.db.models import Exists, OuterRef
+        try:
+            r = AIAnalysisResult.objects.select_related('patient', 'created_by').annotate(
+                is_assigned=Exists(AssignedAuditReport.objects.filter(analysis_result=OuterRef('pk')))
+            ).get(pk=result_id)
+        except AIAnalysisResult.DoesNotExist:
+            return Response({'error': 'Result not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Permission check
+        user = request.user
+        if not getattr(user, 'is_superadmin', False):
+            if getattr(user, 'agency', None):
+                if r.patient.agency != user.agency:
+                    return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                if r.created_by != user:
+                    return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        analyzed_docs = AuditDocument.objects.filter(
+            patient=r.patient,
+            filename__in=r.analyzed_document_names
+        ).values('id', 'filename', 'document_type', 'file_size_mb')
+        analyzed_documents_info = [
+            {
+                'id': str(d['id']),
+                'filename': d['filename'],
+                'document_type': d['document_type'],
+                'file_size_mb': round(d['file_size_mb'], 2),
+            }
+            for d in analyzed_docs
+        ]
+
+        # Clinician doc comes from the AssignedAuditReport's uploaded_document
+        assignment_with_doc = AssignedAuditReport.objects.filter(
+            analysis_result=r,
+            uploaded_document__isnull=False
+        ).exclude(uploaded_document='').select_related('assigned_to').first()
+
+        if assignment_with_doc:
+            clinician_doc_status = 'submitted'
+            clinician_doc_name = assignment_with_doc.uploaded_document_name
+            has_clinician_doc = True
+            clinician_doc_submitted_at = assignment_with_doc.completed_at.isoformat() if assignment_with_doc.completed_at else None
+            clinician_assignment_id = str(assignment_with_doc.id)
+            clinician_name = assignment_with_doc.assigned_to.get_full_name() if assignment_with_doc.assigned_to else None
+        else:
+            clinician_doc_status = 'pending'
+            clinician_doc_name = ''
+            has_clinician_doc = False
+            clinician_doc_submitted_at = None
+            clinician_assignment_id = None
+            clinician_name = None
+
+        return Response({
+            'id': str(r.id),
+            'patient_id': str(r.patient_id),
+            'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
+            'report_markdown': r.report_markdown,
+            'analyzed_document_names': r.analyzed_document_names,
+            'analyzed_documents': analyzed_documents_info,
+            'ai_model_used': r.ai_model_used,
+            'status': r.status,
+            'created_at': r.created_at.isoformat(),
+            'created_by': r.created_by.get_full_name() if r.created_by else None,
+            'is_assigned': getattr(r, 'is_assigned', False),
+            'clinician_document_status': clinician_doc_status,
+            'clinician_document_name': clinician_doc_name,
+            'has_clinician_document': has_clinician_doc,
+            'clinician_document_submitted_at': clinician_doc_submitted_at,
+            'clinician_assignment_id': clinician_assignment_id,
+            'clinician_name': clinician_name,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='results/(?P<result_id>[^/.]+)/submit_document',
+            parser_classes=[MultiPartParser, FormParser])
+    def submit_clinician_document(self, request, result_id=None):
+        """
+        POST multipart with 'document' file field to /api/ai/mistral/results/<id>/submit_document/
+        Clinician submits a document for a specific AI analysis result.
+        """
+        from django.utils import timezone
+        from django.db.models import Exists, OuterRef
+        try:
+            r = AIAnalysisResult.objects.select_related('patient').annotate(
+                is_assigned=Exists(AssignedAuditReport.objects.filter(analysis_result=OuterRef('pk')))
+            ).get(pk=result_id)
+        except AIAnalysisResult.DoesNotExist:
+            return Response({'error': 'Result not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        uploaded_file = request.FILES.get('document')
+        if not uploaded_file:
+            return Response({'error': 'No document file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        r.clinician_document = uploaded_file
+        r.clinician_document_name = uploaded_file.name
+        r.clinician_document_status = 'submitted'
+        r.clinician_document_submitted_at = timezone.now()
+        r.save()
+
+        return Response({
+            'id': str(r.id),
+            'clinician_document_status': r.clinician_document_status,
+            'clinician_document_name': r.clinician_document_name,
+            'clinician_document_submitted_at': r.clinician_document_submitted_at.isoformat(),
+            'message': 'Document submitted successfully.',
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='results/(?P<result_id>[^/.]+)/clinician_document')
+    def download_clinician_document(self, request, result_id=None):
+        """
+        GET /api/ai/mistral/results/<id>/clinician_document/
+        Download the clinician-submitted document for this result.
+        """
+        try:
+            r = AIAnalysisResult.objects.get(pk=result_id)
+        except AIAnalysisResult.DoesNotExist:
+            return Response({'error': 'Result not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not r.clinician_document:
+            return Response({'error': 'No document submitted for this report'}, status=status.HTTP_404_NOT_FOUND)
+
+        file_path = r.clinician_document.path
+        if os.path.exists(file_path):
+            import mimetypes
+            content_type, _ = mimetypes.guess_type(r.clinician_document_name or file_path)
+            if not content_type:
+                content_type = 'application/octet-stream'
+            response = FileResponse(open(file_path, 'rb'), content_type=content_type)
+            response['Content-Disposition'] = f'inline; filename="{r.clinician_document_name}"'
+            return response
+        raise Http404('File not found on server')
 
 
 class AssignedAuditReportView(viewsets.ViewSet):
@@ -1091,6 +1275,24 @@ class AssignedAuditReportView(viewsets.ViewSet):
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
         r = a.analysis_result
+
+        # Fetch the actual AuditDocument records for this patient that match the analyzed filenames
+        analyzed_docs = AuditDocument.objects.filter(
+            patient=r.patient,
+            filename__in=r.analyzed_document_names
+        ).values('id', 'filename', 'document_type', 'file_size_mb', 'created_at')
+
+        analyzed_documents_info = [
+            {
+                'id': str(d['id']),
+                'filename': d['filename'],
+                'document_type': d['document_type'],
+                'file_size_mb': round(d['file_size_mb'], 2),
+                'created_at': d['created_at'].isoformat() if d['created_at'] else None,
+            }
+            for d in analyzed_docs
+        ]
+
         return Response({
             'id': str(a.id),
             'analysis_result_id': str(r.id),
@@ -1098,6 +1300,7 @@ class AssignedAuditReportView(viewsets.ViewSet):
             'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
             'report_markdown': r.report_markdown,
             'analyzed_document_names': r.analyzed_document_names,
+            'analyzed_documents': analyzed_documents_info,
             'ai_model_used': r.ai_model_used,
             'ai_status': r.status,
             'assigned_at': a.assigned_at.isoformat(),

@@ -339,6 +339,11 @@ class AIAnalysisResult(models.Model):
     """
     Stores the Mistral AI-generated Markdown compliance audit report for a patient.
     """
+    CLINICIAN_DOC_STATUS = [
+        ('pending', 'Document Pending'),
+        ('submitted', 'Document Submitted'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     patient = models.ForeignKey(
@@ -368,6 +373,30 @@ class AIAnalysisResult(models.Model):
     ai_model_used = models.CharField(max_length=100, default='open-mistral-nemo')
     status = models.CharField(max_length=10, choices=[('Pass', 'Pass'), ('Fail', 'Fail')], default='Fail')
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Clinician-submitted document for this report
+    clinician_document = models.FileField(
+        upload_to='clinician_report_docs/',
+        null=True,
+        blank=True,
+        help_text='Document submitted by the clinician for this report',
+    )
+    clinician_document_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Original filename of the clinician-submitted document',
+    )
+    clinician_document_status = models.CharField(
+        max_length=20,
+        choices=CLINICIAN_DOC_STATUS,
+        default='pending',
+        help_text='Whether clinician has submitted a document for this report',
+    )
+    clinician_document_submitted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the clinician submitted the document',
+    )
 
     class Meta:
         ordering = ['-created_at']

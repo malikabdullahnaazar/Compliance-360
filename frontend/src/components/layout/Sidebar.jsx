@@ -112,10 +112,9 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
   const filteredMenuItems = menuItems.filter((item) => {
     if (!item.roles) return true;
     // Superadmin can see everything
-    // Superadmin can see everything
     if (user?.role === 'superadmin') {
-      // But superadmin shouldn't see patient/document/agency-dashboard routes
-      if (['patients', 'documents', 'agency-dashboard'].includes(item.path.replace(/^\//, ''))) {
+      // Superadmin should not see agency-specific routes
+      if (['patients', 'documents', 'agency-dashboard', 'agency-users', 'ai-analyzer', 'assigned-audit-reports'].includes(item.path.replace(/^\//, ''))) {
         return false;
       }
       return true;
