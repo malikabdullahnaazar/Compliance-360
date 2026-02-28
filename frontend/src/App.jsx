@@ -7,12 +7,14 @@ import Dashboard from './pages/Dashboard';
 import AgenciesPage from './pages/AgenciesPage';
 import UsersPage from './pages/UsersPage';
 import AgencyDashboard from './pages/AgencyDashboard';
+import AgencyUsersPage from './pages/AgencyUsersPage';
 import PatientsPage from './pages/PatientsPage';
 import NewPatientForm from './pages/NewPatientForm';
 import PatientDetailsPage from './pages/PatientDetailsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
 import AiAnalyzerPage from './pages/AiAnalyzerPage';
+import AssignedAuditReportsPage from './pages/AssignedAuditReportsPage';
 import GlobalUI from './components/feedback/GlobalUI';
 import RoleBasedRoute from './components/common/RoleBasedRoute';
 import './App.css';
@@ -69,6 +71,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/agency-users"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <AgencyUsersPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/patients"
         element={
           <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
@@ -113,6 +123,14 @@ function AppRoutes() {
         element={
           <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
             <AiAnalyzerPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/assigned-audit-reports"
+        element={
+          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+            <AssignedAuditReportsPage />
           </RoleBasedRoute>
         }
       />

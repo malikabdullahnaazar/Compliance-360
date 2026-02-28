@@ -4,7 +4,7 @@ from .models import CustomUser
 
 class UserSerializer(serializers.ModelSerializer):
     agency_name = serializers.SerializerMethodField()
-    password = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = CustomUser

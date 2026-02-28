@@ -10,12 +10,14 @@ from .views import (
     AIAuditAPIView,
     DocumentManagementViewSet,
     MistralAnalyzeView,
+    AssignedAuditReportView,
 )
 
 router = DefaultRouter()
 router.register(r'audit-sessions', AuditSessionViewSet, basename='audit-session')
 router.register(r'findings', ComplianceFindingViewSet, basename='finding')
 router.register(r'documents', DocumentManagementViewSet, basename='document')
+router.register(r'mistral/assignments', AssignedAuditReportView, basename='mistral-assignments')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -27,4 +29,11 @@ urlpatterns = [
     path('mistral/analyze/', MistralAnalyzeView.as_view({'post': 'analyze'}), name='mistral-analyze'),
     path('mistral/save/', MistralAnalyzeView.as_view({'post': 'save_result'}), name='mistral-save'),
     path('mistral/results/', MistralAnalyzeView.as_view({'get': 'list_results'}), name='mistral-results'),
+    # Assignment endpoints
+    path('mistral/assign/', AssignedAuditReportView.as_view({'post': 'assign'}), name='mistral-assign'),
+    path('mistral/assigned/', AssignedAuditReportView.as_view({'get': 'list_assigned'}), name='mistral-list-assigned'),
+    path('mistral/assigned/<pk>/detail/', AssignedAuditReportView.as_view({'get': 'get_detail'}), name='mistral-assignment-detail'),
+    path('mistral/assigned/<pk>/upload_document/', AssignedAuditReportView.as_view({'post': 'upload_document'}), name='mistral-upload-doc'),
+    path('mistral/assigned/<pk>/download_document/', AssignedAuditReportView.as_view({'get': 'download_document'}), name='mistral-download-doc'),
+    path('mistral/clinicians/', AssignedAuditReportView.as_view({'get': 'list_clinicians'}), name='mistral-clinicians'),
 ]

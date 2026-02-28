@@ -69,7 +69,6 @@ class MistralComplianceService:
         user_message = (
             f"Please perform a full compliance audit on the following patient documents.\n\n"
             f"**Patient:** {patient_name}\n"
-            f"**Patient ID:** {patient_info.get('patient_id', 'N/A')}\n"
             f"**Total Documents:** {len(documents)}\n\n"
             f"---\n\n"
             f"{documents_text}"

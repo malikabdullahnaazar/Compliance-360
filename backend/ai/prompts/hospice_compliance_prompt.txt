@@ -81,7 +81,7 @@ Generate your entire response as a well-structured Markdown document. Follow thi
 
 ```
 # Compliance Audit Report
-**Patient:** [Patient Name or ID]
+**Patient:** [Patient Name]
 **Audit Date:** [Date]
 **Documents Analyzed:** [List of document names]
 **Frameworks Applied:** CMS Hospice CoPs, CHAP, HHSC (Texas)

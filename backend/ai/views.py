@@ -28,6 +28,7 @@ from .models import (
     RedFlag,
     AuditRecommendation,
     AIAnalysisResult,
+    AssignedAuditReport,
 )
 from .serializers import (
     AuditSessionListSerializer,
@@ -587,10 +588,15 @@ class DocumentManagementViewSet(viewsets.ModelViewSet):
              pass
 
         file_path = os.path.join(settings.MEDIA_ROOT, document.file_path)
-        
+
         if os.path.exists(file_path):
-            response = FileResponse(open(file_path, 'rb'), content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="{document.filename}"'
+            import mimetypes
+            content_type, _ = mimetypes.guess_type(document.filename)
+            if not content_type:
+                content_type = 'application/octet-stream'
+            # Use 'inline' so the browser opens the file in a new tab
+            response = FileResponse(open(file_path, 'rb'), content_type=content_type)
+            response['Content-Disposition'] = f'inline; filename="{document.filename}"'
             return response
         else:
             raise Http404("File not found")
@@ -839,6 +845,33 @@ class MistralAnalyzeView(viewsets.ViewSet):
                 documents=documents_data,
                 patient_info=patient_info,
             )
+            import re
+            from datetime import datetime
+            current_date_str = datetime.now().strftime("%B %d, %Y")
+
+            # Replace all common AI-generated date placeholders with the real date
+            # The AI sometimes writes [Date], [Current Date], [Audit Date], [date], etc.
+            date_pattern = re.compile(
+                r'\[(?:Date|Current\s+Date|Audit\s+Date|date|current\s+date|TODAY)\]',
+                re.IGNORECASE
+            )
+            report_markdown = date_pattern.sub(current_date_str, report_markdown)
+
+            # Post-process: make document names clickable links.
+            # Use re.sub with a negative lookbehind on '](' to avoid re-replacing
+            # filenames that are already inside a markdown link text.
+            for doc in documents_qs:
+                escaped = re.escape(doc.filename)
+                link = f"[{doc.filename}](doc:{str(doc.id)})"
+                # Only replace occurrences NOT already preceded by '](' (already a link)
+                # Pattern: filename not immediately inside a [] already
+                report_markdown = re.sub(
+                    rf'(?<!\[){escaped}(?!\])',
+                    link,
+                    report_markdown,
+                )
+
+
         except Exception as exc:
             logger.error(f'Mistral analysis failed: {exc}')
             return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -861,6 +894,7 @@ class MistralAnalyzeView(viewsets.ViewSet):
         report_markdown = request.data.get('report_markdown', '').strip()
         document_names = request.data.get('document_names', [])
         ai_model = request.data.get('ai_model_used', 'open-mistral-nemo')
+        status_val = request.data.get('status', 'Fail')
 
         if not patient_id or not report_markdown:
             return Response({'error': 'patient_id and report_markdown are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -870,12 +904,33 @@ class MistralAnalyzeView(viewsets.ViewSet):
         except Patient.DoesNotExist:
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        # ── Server-side status recomputation ─────────────────────────────────
+        # Always derive status from the report content so frontend logic drifts
+        # or bugs don't cause incorrect stored statuses.
+        import re as _re
+        findings_match = _re.search(r'Total\s+Findings\s*:\s*(\d+)', report_markdown, _re.IGNORECASE)
+        if findings_match:
+            total_findings = int(findings_match.group(1))
+            status_val = 'Pass' if total_findings == 0 else 'Fail'
+        else:
+            score_match = _re.search(r'Compliance\s+Score\s*:\s*(\d+)\s*/\s*100', report_markdown, _re.IGNORECASE)
+            if score_match:
+                score = int(score_match.group(1))
+                status_val = 'Pass' if score >= 85 else 'Fail'
+            else:
+                risk_match = _re.search(r'Overall\s+Risk\s+Level\s*:.*?(CRITICAL|HIGH|MEDIUM|LOW|NONE)', report_markdown, _re.IGNORECASE)
+                if risk_match:
+                    risk_level = risk_match.group(1).upper()
+                    status_val = 'Pass' if risk_level in ('LOW', 'NONE') else 'Fail'
+                # else keep whatever the frontend sent as a last resort
+
         result = AIAnalysisResult.objects.create(
             patient=patient,
             created_by=request.user,
             analyzed_document_names=document_names,
             report_markdown=report_markdown,
             ai_model_used=ai_model,
+            status=status_val,
         )
 
         return Response({
@@ -891,7 +946,10 @@ class MistralAnalyzeView(viewsets.ViewSet):
         Returns all saved AI analysis results for a patient.
         """
         patient_id = request.query_params.get('patient_id')
-        qs = AIAnalysisResult.objects.select_related('patient', 'created_by')
+        from django.db.models import Exists, OuterRef
+        qs = AIAnalysisResult.objects.select_related('patient', 'created_by').annotate(
+            is_assigned=Exists(AssignedAuditReport.objects.filter(analysis_result=OuterRef('pk')))
+        )
 
         user = request.user
         if hasattr(user, 'is_superadmin') and user.is_superadmin:
@@ -912,10 +970,216 @@ class MistralAnalyzeView(viewsets.ViewSet):
                 'report_markdown': r.report_markdown,
                 'analyzed_document_names': r.analyzed_document_names,
                 'ai_model_used': r.ai_model_used,
+                'status': r.status,
                 'created_at': r.created_at.isoformat(),
                 'created_by': r.created_by.get_full_name() if r.created_by else None,
+                'is_assigned': getattr(r, 'is_assigned', False),
             }
             for r in qs
         ]
 
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class AssignedAuditReportView(viewsets.ViewSet):
+    """
+    Endpoints for assigning AI analysis results to clinicians.
+
+    POST /api/ai/mistral/assign/        – assign a result to a clinician
+    GET  /api/ai/mistral/assigned/      – list all assignments (agency scoped)
+    GET  /api/ai/mistral/assigned/<id>/ – fetch a single assignment detail
+    POST /api/ai/mistral/assigned/<id>/upload_document/ – upload document & mark complete
+    GET  /api/ai/mistral/clinicians/    – list clinicians in admin's agency
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @action(detail=False, methods=['post'], url_path='assign')
+    def assign(self, request):
+        """
+        POST { analysis_result_id, clinician_id }
+        Creates an AssignedAuditReport record.
+        """
+        from users.models import CustomUser
+        result_id = request.data.get('analysis_result_id')
+        clinician_id = request.data.get('clinician_id')
+
+        if not result_id or not clinician_id:
+            return Response({'error': 'analysis_result_id and clinician_id are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = AIAnalysisResult.objects.get(id=result_id)
+        except AIAnalysisResult.DoesNotExist:
+            return Response({'error': 'Analysis result not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            clinician = CustomUser.objects.get(id=clinician_id, role='clinician')
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'Clinician not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check agency scope
+        user = request.user
+        if getattr(user, 'role', None) == 'agency_admin':
+            if clinician.agency != user.agency:
+                return Response({'error': 'Clinician does not belong to your agency'}, status=status.HTTP_403_FORBIDDEN)
+
+        assignment = AssignedAuditReport.objects.create(
+            analysis_result=result,
+            assigned_by=user,
+            assigned_to=clinician,
+        )
+
+        return Response({
+            'id': str(assignment.id),
+            'assigned_at': assignment.assigned_at.isoformat(),
+            'message': 'Report assigned successfully',
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='assigned')
+    def list_assigned(self, request):
+        """
+        GET /api/ai/mistral/assigned/
+        Returns all assignment records scoped to the requesting agency admin.
+        """
+        user = request.user
+        qs = AssignedAuditReport.objects.select_related(
+            'analysis_result', 'analysis_result__patient',
+            'assigned_by', 'assigned_to'
+        )
+
+        if getattr(user, 'is_superadmin', False):
+            pass  # see all
+        elif getattr(user, 'agency', None):
+            qs = qs.filter(analysis_result__patient__agency=user.agency)
+        else:
+            qs = qs.none()
+
+        data = []
+        for a in qs:
+            r = a.analysis_result
+            data.append({
+                'id': str(a.id),
+                'analysis_result_id': str(r.id),
+                'patient_id': str(r.patient_id),
+                'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
+                'report_markdown': r.report_markdown,
+                'analyzed_document_names': r.analyzed_document_names,
+                'ai_model_used': r.ai_model_used,
+                'ai_status': r.status,
+                'assigned_at': a.assigned_at.isoformat(),
+                'assigned_by': a.assigned_by.get_full_name() if a.assigned_by else None,
+                'assigned_to_id': str(a.assigned_to.id) if a.assigned_to else None,
+                'assigned_to_name': a.assigned_to.get_full_name() if a.assigned_to else None,
+                'assigned_to_email': a.assigned_to.email if a.assigned_to else None,
+                'status': a.status,
+                'uploaded_document_name': a.uploaded_document_name,
+                'has_document': bool(a.uploaded_document),
+                'completed_at': a.completed_at.isoformat() if a.completed_at else None,
+            })
+
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='detail')
+    def get_detail(self, request, pk=None):
+        """GET /api/ai/mistral/assigned/<id>/detail/"""
+        try:
+            a = AssignedAuditReport.objects.select_related(
+                'analysis_result', 'analysis_result__patient',
+                'assigned_by', 'assigned_to'
+            ).get(pk=pk)
+        except AssignedAuditReport.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        r = a.analysis_result
+        return Response({
+            'id': str(a.id),
+            'analysis_result_id': str(r.id),
+            'patient_id': str(r.patient_id),
+            'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
+            'report_markdown': r.report_markdown,
+            'analyzed_document_names': r.analyzed_document_names,
+            'ai_model_used': r.ai_model_used,
+            'ai_status': r.status,
+            'assigned_at': a.assigned_at.isoformat(),
+            'assigned_by': a.assigned_by.get_full_name() if a.assigned_by else None,
+            'assigned_to_id': str(a.assigned_to.id) if a.assigned_to else None,
+            'assigned_to_name': a.assigned_to.get_full_name() if a.assigned_to else None,
+            'assigned_to_email': a.assigned_to.email if a.assigned_to else None,
+            'status': a.status,
+            'uploaded_document_name': a.uploaded_document_name,
+            'has_document': bool(a.uploaded_document),
+            'completed_at': a.completed_at.isoformat() if a.completed_at else None,
+        })
+
+    @action(detail=True, methods=['post'], url_path='upload_document')
+    def upload_document(self, request, pk=None):
+        """
+        POST multipart with 'document' file field.
+        Uploads a document, marks the assignment as complete.
+        """
+        from django.utils import timezone
+        try:
+            assignment = AssignedAuditReport.objects.get(pk=pk)
+        except AssignedAuditReport.DoesNotExist:
+            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if assignment.status == 'complete':
+            return Response({'error': 'This report is already completed. Cannot re-upload.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        uploaded_file = request.FILES.get('document')
+        if not uploaded_file:
+            return Response({'error': 'No document file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        assignment.uploaded_document = uploaded_file
+        assignment.uploaded_document_name = uploaded_file.name
+        assignment.status = 'complete'
+        assignment.completed_at = timezone.now()
+        assignment.save()
+
+        return Response({
+            'id': str(assignment.id),
+            'status': assignment.status,
+            'uploaded_document_name': assignment.uploaded_document_name,
+            'completed_at': assignment.completed_at.isoformat(),
+            'message': 'Document uploaded and report marked as complete.',
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='download_document')
+    def download_document(self, request, pk=None):
+        """GET /api/ai/mistral/assigned/<id>/download_document/ – download the uploaded doc"""
+        try:
+            assignment = AssignedAuditReport.objects.get(pk=pk)
+        except AssignedAuditReport.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not assignment.uploaded_document:
+            return Response({'error': 'No document uploaded'}, status=status.HTTP_404_NOT_FOUND)
+
+        file_path = assignment.uploaded_document.path
+        if os.path.exists(file_path):
+            response = FileResponse(
+                open(file_path, 'rb'),
+                content_type='application/pdf',
+            )
+            response['Content-Disposition'] = f'inline; filename="{assignment.uploaded_document_name}"'
+            return response
+        raise Http404("File not found on server")
+
+    @action(detail=False, methods=['get'], url_path='clinicians')
+    def list_clinicians(self, request):
+        """GET /api/ai/mistral/clinicians/ – return clinician users in admin's agency"""
+        from users.models import CustomUser
+        user = request.user
+        qs = CustomUser.objects.filter(role='clinician', is_active=True)
+        if getattr(user, 'agency', None):
+            qs = qs.filter(agency=user.agency)
+        data = [
+            {
+                'id': str(u.id),
+                'full_name': u.get_full_name() or u.username,
+                'email': u.email,
+                'username': u.username,
+            }
+            for u in qs
+        ]
         return Response(data, status=status.HTTP_200_OK)

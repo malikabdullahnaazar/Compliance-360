@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import {
     Brain, FileText, X, Save, ChevronDown, AlertTriangle,
-    Search, ChevronUp, Calendar, Cpu, FileStack,
+    Search, ChevronUp, Calendar, Cpu, FileStack, Users, ChevronLeft, ChevronRight, CheckCircle, XCircle,
+    UserCheck, ClipboardList
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -22,6 +23,8 @@ const analyzeDocuments = (patientId, documentIds) =>
 const saveResult = (payload) => api.post('/ai/mistral/save/', payload);
 const fetchResults = (patientId) =>
     api.get('/ai/mistral/results/', { params: patientId ? { patient_id: patientId } : {} });
+const fetchClinicians = () => api.get('/ai/mistral/clinicians/');
+const assignReport = (payload) => api.post('/ai/mistral/assign/', payload);
 
 /* ─── Shared Markdown config ──────────────────────────────────────────────── */
 const MD_PLUGINS = [remarkGfm, remarkBreaks];
@@ -100,6 +103,57 @@ const mdComponents = {
             {children}
         </td>
     ),
+    // Links (handling custom doc:id scheme)
+    a: ({ href, children }) => {
+        const isDoc = href && href.startsWith('doc:');
+
+        const handleClick = async (e) => {
+            if (isDoc) {
+                e.preventDefault();
+                e.stopPropagation();
+                const docId = href.slice(4); // strip 'doc:' prefix safely
+                try {
+                    const response = await documentService.downloadDocument(docId);
+                    // Use content-type from response headers, default to PDF
+                    const contentType =
+                        response.headers?.['content-type'] ||
+                        response.headers?.get?.('content-type') ||
+                        'application/pdf';
+                    const blob = new Blob([response.data], { type: contentType });
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                    // Revoke object URL after a short delay to free memory
+                    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+                } catch (error) {
+                    console.error('Failed to open document', error);
+                    alert('Failed to open document. Please try again.');
+                }
+            }
+        };
+
+        if (isDoc) {
+            return (
+                <button
+                    type="button"
+                    onClick={handleClick}
+                    className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline font-medium cursor-pointer"
+                >
+                    {children}
+                </button>
+            );
+        }
+
+        return (
+            <a
+                href={href}
+                className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline font-medium cursor-pointer"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                {children}
+            </a>
+        );
+    },
 };
 
 /* ─── SearchablePatientSelect ─────────────────────────────────────────────── */
@@ -284,7 +338,7 @@ const AnalyzingOverlay = () => (
 );
 
 /* ─── Result popup modal ──────────────────────────────────────────────────── */
-const ResultModal = ({ result, onClose, onSave, saving }) => (
+const ResultModal = ({ result, onClose }) => (
     /*
      * z-[200] → sits above Navbar (z-50).
      * We do NOT use inset-0 for the content wrapper – instead we use
@@ -334,25 +388,7 @@ const ResultModal = ({ result, onClose, onSave, saving }) => (
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700
           flex-shrink-0 flex justify-end gap-3 rounded-b-2xl">
-                    <Button variant="outline" onClick={onClose} className="px-6">Cancel</Button>
-                    <Button
-                        variant="primary"
-                        onClick={onSave}
-                        disabled={saving}
-                        className="px-6 flex items-center gap-2"
-                    >
-                        {saving ? (
-                            <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                Saving…
-                            </>
-                        ) : (
-                            <>
-                                <Save className="h-4 w-4" />
-                                Save Result
-                            </>
-                        )}
-                    </Button>
+                    <Button variant="primary" onClick={onClose} className="px-6">Close</Button>
                 </div>
             </div>
         </div>
@@ -384,9 +420,10 @@ const AiAnalyzerPage = () => {
     const [loadingDocuments, setLoadingDocuments] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
 
+    const [expandedResultPatient, setExpandedResultPatient] = useState(null);
+
     /* Result popup */
     const [pendingResult, setPendingResult] = useState(null);
-    const [saving, setSaving] = useState(false);
 
     /* Results tab */
     const [resultPatient, setResultPatient] = useState('');
@@ -394,10 +431,18 @@ const AiAnalyzerPage = () => {
     const [loadingResults, setLoadingResults] = useState(false);
     const [expandedResult, setExpandedResult] = useState(null);
 
-    useEffect(() => { fetchPatients(); }, []);
+    /* Assign modal */
+    const [clinicians, setClinicians] = useState([]);
+    const [assignTarget, setAssignTarget] = useState(null); // { resultId, patientName, date }
+    const [selectedClinician, setSelectedClinician] = useState('');
+    const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+    const [showConfirmAssign, setShowConfirmAssign] = useState(false);
+    const [assigning, setAssigning] = useState(false);
+
+    useEffect(() => { fetchPatients(); loadClinicians(); }, []);
 
     useEffect(() => {
-        if (activeTab === 'result') loadSavedResults(resultPatient);
+        if (activeTab === 'result' || activeTab === 'passed') loadSavedResults();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab]);
 
@@ -428,16 +473,65 @@ const AiAnalyzerPage = () => {
         }
     };
 
-    const loadSavedResults = async (patientId) => {
+    const loadSavedResults = async () => {
         setLoadingResults(true);
         try {
-            const res = await fetchResults(patientId || '');
+            const res = await fetchResults();
             setSavedResults(res.data);
         } catch {
             dispatch(addToast({ type: 'error', message: 'Failed to load saved results' }));
         } finally {
             setLoadingResults(false);
         }
+    };
+
+    const loadClinicians = async () => {
+        try {
+            const res = await fetchClinicians();
+            setClinicians(res.data);
+        } catch {
+            // non-critical – don't toast
+        }
+    };
+
+    /* ── handlers ── */
+    const handleOpenAssign = (result) => {
+        setAssignTarget(result);
+        setSelectedClinician('');
+        setShowAssignDropdown(true);
+        setShowConfirmAssign(false);
+    };
+
+    const handleConfirmAssign = async () => {
+        if (!assignTarget || !selectedClinician) return;
+        setAssigning(true);
+        try {
+            await assignReport({
+                analysis_result_id: assignTarget.id,
+                clinician_id: selectedClinician,
+            });
+            dispatch(addToast({ type: 'success', message: 'Report assigned successfully!' }));
+
+            // Update local state to mark this result as assigned
+            setSavedResults(prev => prev.map(result =>
+                result.id === assignTarget.id ? { ...result, is_assigned: true } : result
+            ));
+
+            setShowConfirmAssign(false);
+            setShowAssignDropdown(false);
+            setAssignTarget(null);
+        } catch (err) {
+            dispatch(addToast({ type: 'error', message: err?.response?.data?.error || 'Failed to assign report' }));
+        } finally {
+            setAssigning(false);
+        }
+    };
+
+    const handleCancelAssign = () => {
+        setShowAssignDropdown(false);
+        setShowConfirmAssign(false);
+        setAssignTarget(null);
+        setSelectedClinician('');
     };
 
     /* ── handlers ── */
@@ -461,12 +555,64 @@ const AiAnalyzerPage = () => {
         try {
             const res = await analyzeDocuments(selectedPatient, selectedDocuments);
             const { report_markdown, patient_info, document_names } = res.data;
+
+            // ── Determine Pass/Fail status ──────────────────────────────
+            // Strategy: parse actual numbers from the AI report rather than
+            // keyword-matching (headings like "Red Flags" always appear even
+            // when there are 0 findings, making keyword matching unreliable).
+
+            let status = 'Fail'; // default
+
+            // 1. Parse "Total Findings: N" from the Executive Summary line
+            //    Matches: "Total Findings: 0 | Critical: 0 | ..."
+            const findingsMatch = report_markdown.match(
+                /Total\s+Findings\s*:\s*(\d+)/i
+            );
+            if (findingsMatch) {
+                const totalFindings = parseInt(findingsMatch[1], 10);
+                status = totalFindings === 0 ? 'Pass' : 'Fail';
+            } else {
+                // 2. Parse Compliance Score: X/100 — ≥ 85 = Pass
+                const scoreMatch = report_markdown.match(
+                    /Compliance\s+Score\s*:\s*(\d+)\s*\/\s*100/i
+                );
+                if (scoreMatch) {
+                    const score = parseInt(scoreMatch[1], 10);
+                    status = score >= 85 ? 'Pass' : 'Fail';
+                } else {
+                    // 3. Parse Overall Risk Level
+                    const riskMatch = report_markdown.match(
+                        /Overall\s+Risk\s+Level\s*:.*?(CRITICAL|HIGH|MEDIUM|LOW|NONE)/i
+                    );
+                    if (riskMatch) {
+                        const riskLevel = riskMatch[1].toUpperCase();
+                        status = (riskLevel === 'LOW' || riskLevel === 'NONE') ? 'Pass' : 'Fail';
+                    } else {
+                        // 4. Last resort: check only actual finding lines for FAIL/❌
+                        //    (not section headings which always contain "Red Flags")
+                        const failLinePattern = /^[-*]\s.*?(?:❌\s*FAIL|status:\s*❌)/im;
+                        status = failLinePattern.test(report_markdown) ? 'Fail' : 'Pass';
+                    }
+                }
+            }
+
+            // Auto save result
+            await saveResult({
+                patient_id: patient_info.patient_id,
+                report_markdown: report_markdown,
+                document_names: document_names,
+                ai_model_used: 'open-mistral-nemo',
+                status: status,
+            });
+
             setPendingResult({
                 report_markdown,
                 ai_model: 'open-mistral-nemo',
                 patient_id: patient_info.patient_id,
                 document_names,
+                status,
             });
+            dispatch(addToast({ type: 'success', message: 'Analysis completed and saved successfully!' }));
         } catch (err) {
             dispatch(addToast({ type: 'error', message: err?.response?.data?.error || 'AI analysis failed. Please try again.' }));
         } finally {
@@ -474,31 +620,9 @@ const AiAnalyzerPage = () => {
         }
     };
 
-    const handleSaveResult = async () => {
-        if (!pendingResult) return;
-        setSaving(true);
-        try {
-            await saveResult({
-                patient_id: pendingResult.patient_id,
-                report_markdown: pendingResult.report_markdown,
-                document_names: pendingResult.document_names,
-                ai_model_used: pendingResult.ai_model,
-            });
-            dispatch(addToast({ type: 'success', message: 'Analysis result saved successfully!' }));
-            setPendingResult(null);
-            setActiveTab('result');
-            loadSavedResults('');
-        } catch {
-            dispatch(addToast({ type: 'error', message: 'Failed to save result' }));
-        } finally {
-            setSaving(false);
-        }
-    };
-
     const handleResultPatientChange = (id) => {
         setResultPatient(id);
-        setExpandedResult(null);
-        loadSavedResults(id);
+        setExpandedResultPatient(id ? true : false);
     };
 
     /* ────────────────────────────────────────────────────── */
@@ -510,8 +634,6 @@ const AiAnalyzerPage = () => {
                 <ResultModal
                     result={pendingResult}
                     onClose={() => setPendingResult(null)}
-                    onSave={handleSaveResult}
-                    saving={saving}
                 />
             )}
 
@@ -547,6 +669,7 @@ const AiAnalyzerPage = () => {
                                     {[
                                         { key: 'analyze', label: 'Analyze' },
                                         { key: 'result', label: 'Results' },
+                                        { key: 'passed', label: 'Passed' },
                                     ].map(({ key, label }) => (
                                         <button
                                             key={key}
@@ -680,119 +803,265 @@ const AiAnalyzerPage = () => {
                                 </div>
                             )}
 
-                            {/* ── RESULTS TAB ── */}
-                            {activeTab === 'result' && (
-                                <div className="space-y-6">
-                                    {/* Searchable patient filter */}
-                                    <div className="max-w-md">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Filter by Patient
-                                        </label>
-                                        <SearchablePatientSelect
-                                            patients={patients}
-                                            value={resultPatient}
-                                            onChange={handleResultPatientChange}
-                                            placeholder="Filter by patient…"
-                                            disabled={loadingPatients}
-                                            allOption="All Patients"
-                                        />
-                                    </div>
+                            {/* ── RESULTS & PASSED TAB ── */}
+                            {(activeTab === 'result' || activeTab === 'passed') && (() => {
+                                const filteredResults = savedResults.filter(r =>
+                                    (!resultPatient || r.patient_id === resultPatient) &&
+                                    (activeTab === 'passed' ? r.status === 'Pass' : r.status !== 'Pass')
+                                );
 
-                                    {/* Results list */}
-                                    {loadingResults ? (
-                                        <div className="flex justify-center items-center h-40">
-                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
-                                        </div>
-                                    ) : savedResults.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-16 text-center">
-                                            <div className="h-16 w-16 mb-4 rounded-full bg-gray-100 dark:bg-gray-800
-                        flex items-center justify-center">
-                                                <AlertTriangle className="h-8 w-8 text-gray-400" />
+                                const groupedData = filteredResults.reduce((acc, r) => {
+                                    if (!acc[r.patient_id]) {
+                                        acc[r.patient_id] = { patient_id: r.patient_id, patient_name: r.patient_name, count: 0, latest: r.created_at, results: [] };
+                                    }
+                                    acc[r.patient_id].count++;
+                                    acc[r.patient_id].results.push(r);
+                                    if (new Date(r.created_at) > new Date(acc[r.patient_id].latest)) acc[r.patient_id].latest = r.created_at;
+                                    return acc;
+                                }, {});
+
+                                const groupedList = Object.values(groupedData).sort((a, b) => new Date(b.latest) - new Date(a.latest));
+
+                                return (
+                                    <div className="space-y-6">
+                                        {!expandedResultPatient && (
+                                            <div className="max-w-md">
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                    Filter by Patient
+                                                </label>
+                                                <SearchablePatientSelect
+                                                    patients={patients}
+                                                    value={resultPatient}
+                                                    onChange={(id) => { setResultPatient(id); setExpandedResultPatient(id ? true : false); }}
+                                                    placeholder="Filter by patient…"
+                                                    disabled={loadingPatients}
+                                                    allOption="All Patients"
+                                                />
                                             </div>
-                                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-                                                No saved results
-                                            </h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
-                                                Run an analysis in the Analyze tab and save the result to see it here.
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {savedResults.map((result) => (
-                                                <Card
-                                                    key={result.id}
-                                                    className="border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden"
-                                                >
-                                                    {/* Collapsed row header */}
-                                                    <button
-                                                        type="button"
-                                                        className="w-full text-left"
-                                                        onClick={() => setExpandedResult(expandedResult === result.id ? null : result.id)}
-                                                    >
-                                                        <div className="px-5 py-4 flex items-start justify-between gap-4
-                              hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                                                            <div className="flex items-start gap-4 min-w-0 flex-1">
-                                                                {/* Icon */}
-                                                                <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30
-                                  flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                                    <Brain className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                                                                </div>
-                                                                {/* Meta grid */}
-                                                                <div className="min-w-0 flex-1 space-y-1">
-                                                                    <p className="font-semibold text-gray-900 dark:text-white text-sm">
-                                                                        {result.patient_name}
-                                                                    </p>
-                                                                    {/* Info pills in a row */}
-                                                                    <div className="flex flex-wrap gap-3 mt-1">
-                                                                        <span className="inline-flex items-center gap-1.5 text-xs
-                                      text-gray-500 dark:text-gray-400">
-                                                                            <Calendar className="h-3.5 w-3.5" />
-                                                                            {new Date(result.created_at).toLocaleString()}
-                                                                        </span>
-                                                                        <span className="inline-flex items-center gap-1.5 text-xs
-                                      text-gray-500 dark:text-gray-400">
-                                                                            <FileStack className="h-3.5 w-3.5" />
-                                                                            {result.analyzed_document_names?.length ?? 0} document(s)
-                                                                        </span>
-                                                                        <span className="inline-flex items-center gap-1.5 text-xs
-                                      text-gray-500 dark:text-gray-400">
-                                                                            <Cpu className="h-3.5 w-3.5" />
-                                                                            {result.ai_model_used}
-                                                                        </span>
+                                        )}
+
+                                        {loadingResults ? (
+                                            <div className="flex justify-center items-center h-40">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
+                                            </div>
+                                        ) : expandedResultPatient ? (
+                                            <div className="space-y-6">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <button onClick={() => { setExpandedResultPatient(false); setExpandedResult(null); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                                                            <ChevronLeft className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                                                        </button>
+                                                        <div>
+                                                            <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
+                                                                <Users className="h-6 w-6 text-teal-500" />
+                                                                {groupedData[resultPatient]?.patient_name || 'Patient'}
+                                                            </h2>
+                                                            <p className="text-sm text-gray-500 dark:text-gray-400">Analysis History ({groupedData[resultPatient]?.count || 0} reports)</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {(groupedData[resultPatient]?.results || []).map((result) => (
+                                                        <Card key={result.id} className="border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+                                                            <div className="px-5 py-4 flex items-start justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                                                                <button type="button" className="flex-1 text-left flex items-start gap-4 min-w-0" onClick={() => setExpandedResult(expandedResult === result.id ? null : result.id)}>
+                                                                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${result.status === 'Pass' ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'}`}>
+                                                                        {result.status === 'Pass' ? <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" /> : <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />}
                                                                     </div>
-                                                                    {/* Doc names */}
-                                                                    {result.analyzed_document_names?.length > 0 && (
-                                                                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                                                                            {result.analyzed_document_names.join(' · ')}
+                                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                                        <p className="font-semibold text-gray-900 dark:text-white text-sm flex items-center gap-2">
+                                                                            {result.patient_name}
+                                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${result.status === 'Pass' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                                {result.status}
+                                                                            </span>
                                                                         </p>
+                                                                        <div className="flex flex-wrap gap-3 mt-1">
+                                                                            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                                <Calendar className="h-3.5 w-3.5" />
+                                                                                {new Date(result.created_at).toLocaleString()}
+                                                                            </span>
+                                                                            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                                <FileStack className="h-3.5 w-3.5" />
+                                                                                {result.analyzed_document_names?.length ?? 0} document(s)
+                                                                            </span>
+                                                                            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                                <Cpu className="h-3.5 w-3.5" />
+                                                                                {result.ai_model_used}
+                                                                            </span>
+                                                                        </div>
+                                                                        {result.analyzed_document_names?.length > 0 && (
+                                                                            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                                                                                {result.analyzed_document_names.join(' · ')}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </button>
+                                                                <div className="flex items-center gap-2 flex-shrink-0 mt-1">
+                                                                    {result.status !== 'Pass' && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                if (!result.is_assigned) handleOpenAssign(result);
+                                                                            }}
+                                                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${result.is_assigned
+                                                                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 cursor-default cursor-not-allowed'
+                                                                                : 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 border-teal-200 dark:border-teal-800 cursor-pointer'
+                                                                                }`}
+                                                                            title={result.is_assigned ? "This report is already assigned" : "Assign this report to a clinician"}
+                                                                            disabled={result.is_assigned}
+                                                                        >
+                                                                            {result.is_assigned ? <CheckCircle className="h-3.5 w-3.5 text-gray-400" /> : <UserCheck className="h-3.5 w-3.5" />}
+                                                                            {result.is_assigned ? "Assigned" : "Assign"}
+                                                                        </button>
                                                                     )}
+                                                                    <ChevronDown
+                                                                        onClick={() => setExpandedResult(expandedResult === result.id ? null : result.id)}
+                                                                        className={`h-5 w-5 text-gray-400 flex-shrink-0 transition-transform cursor-pointer ${expandedResult === result.id ? 'rotate-180' : ''}`}
+                                                                    />
                                                                 </div>
                                                             </div>
-                                                            <ChevronDown
-                                                                className={`h-5 w-5 text-gray-400 flex-shrink-0 transition-transform mt-1
-                                  ${expandedResult === result.id ? 'rotate-180' : ''}`}
-                                                            />
-                                                        </div>
-                                                    </button>
-
-                                                    {/* Expanded report */}
-                                                    {expandedResult === result.id && (
-                                                        <div className="border-t border-gray-200 dark:border-gray-700
-                              px-6 py-6 bg-gray-50/50 dark:bg-gray-800/20">
-                                                            <MarkdownReport markdown={result.report_markdown} />
-                                                        </div>
-                                                    )}
-                                                </Card>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                                            {expandedResult === result.id && (
+                                                                <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-6 bg-gray-50/50 dark:bg-gray-800/20">
+                                                                    <MarkdownReport markdown={result.report_markdown} />
+                                                                </div>
+                                                            )}
+                                                        </Card>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : groupedList.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                                <div className="h-16 w-16 mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                                    <AlertTriangle className="h-8 w-8 text-gray-400" />
+                                                </div>
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                                                    No saved {activeTab} results
+                                                </h3>
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                                                    Run an analysis in the Analyze tab and save the result to see it here.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                {groupedList.map((p) => (
+                                                    <Card key={p.patient_id} className="cursor-pointer hover:border-teal-400 transition-colors" onClick={() => { setResultPatient(p.patient_id); setExpandedResultPatient(true); }}>
+                                                        <CardContent className="p-5 flex items-center gap-4">
+                                                            <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center">
+                                                                <Users className="h-6 w-6 text-teal-600" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">{p.patient_name}</h3>
+                                                                <p className="text-sm text-gray-500">{p.count} Report{p.count > 1 ? 's' : ''}</p>
+                                                            </div>
+                                                            <ChevronRight className="h-5 w-5 text-gray-400" />
+                                                        </CardContent>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                         </CardContent>
                     </Card>
                 </div>
             </div>
+
+            {/* ── Assign Clinician Dropdown Modal ─────────────────────────────── */}
+            {showAssignDropdown && !showConfirmAssign && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={handleCancelAssign} />
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="h-10 w-10 rounded-xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center flex-shrink-0">
+                                <UserCheck className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Assign Report to Clinician</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {assignTarget?.patient_name} &bull; {assignTarget ? new Date(assignTarget.created_at).toLocaleDateString() : ''}
+                                </p>
+                            </div>
+                            <button onClick={handleCancelAssign} className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {clinicians.length === 0 ? (
+                            <div className="py-6 text-center">
+                                <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                                <p className="text-sm text-gray-500">No clinicians found in your agency.</p>
+                                <p className="text-xs text-gray-400 mt-1">Create clinician users first from the Users section.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Clinician</label>
+                                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                    {clinicians.map((c) => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => setSelectedClinician(c.id)}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-colors ${selectedClinician === c.id
+                                                ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20'
+                                                : 'border-gray-200 dark:border-gray-700 hover:border-teal-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                                }`}
+                                        >
+                                            <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold text-sm flex-shrink-0">
+                                                {c.full_name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{c.full_name}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.email}</p>
+                                            </div>
+                                            {selectedClinician === c.id && <CheckCircle className="h-4 w-4 text-teal-600 flex-shrink-0" />}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex gap-3 mt-5">
+                                    <Button variant="outline" onClick={handleCancelAssign} className="flex-1">Cancel</Button>
+                                    <Button
+                                        variant="primary"
+                                        disabled={!selectedClinician}
+                                        onClick={() => setShowConfirmAssign(true)}
+                                        className="flex-1"
+                                    >
+                                        Continue
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Confirm Assignment Modal ─────────────────────────────────────── */}
+            {showConfirmAssign && (
+                <div className="fixed inset-0 z-[310] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowConfirmAssign(false)} />
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
+                        <div className="h-14 w-14 rounded-full bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center mx-auto mb-4">
+                            <ClipboardList className="h-7 w-7 text-teal-600 dark:text-teal-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Confirm Assignment</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Assign this report for <span className="font-semibold text-gray-800 dark:text-white">{assignTarget?.patient_name}</span> to:
+                        </p>
+                        <p className="text-base font-bold text-teal-600 dark:text-teal-400 mb-5">
+                            {clinicians.find(c => c.id === selectedClinician)?.full_name}
+                        </p>
+                        <div className="flex gap-3">
+                            <Button variant="outline" onClick={() => setShowConfirmAssign(false)} disabled={assigning} className="flex-1">Cancel</Button>
+                            <Button variant="primary" onClick={handleConfirmAssign} disabled={assigning} className="flex-1">
+                                {assigning ? 'Assigning…' : 'OK, Assign'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

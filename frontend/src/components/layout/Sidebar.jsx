@@ -14,6 +14,7 @@ import {
   TrendingUp,
   X,
   Brain,
+  ClipboardList,
 } from 'lucide-react';
 import { addToast } from '../../store/slices/uiSlice';
 import AuthContext from '../../context/AuthContext';
@@ -77,6 +78,12 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       roles: ['agency_admin'],
     },
     {
+      icon: Users,
+      label: 'User',
+      path: '/agency-users',
+      roles: ['agency_admin'],
+    },
+    {
       icon: Stethoscope,
       label: 'Patients',
       path: '/patients',
@@ -92,6 +99,12 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       icon: Brain,
       label: 'AI Analyzer',
       path: '/ai-analyzer',
+      roles: ['agency_admin'],
+    },
+    {
+      icon: ClipboardList,
+      label: 'Assigned Audit Reports',
+      path: '/assigned-audit-reports',
       roles: ['agency_admin'],
     },
   ];
@@ -113,7 +126,7 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       if (['admin/agencies', 'admin/users', 'analytics', 'agency-dashboard'].includes(item.path.replace(/^\//, ''))) {
         return false;
       }
-      return ['/dashboard', '/patients', '/documents', '/ai-analyzer'].includes(item.path);
+      return ['/dashboard', '/agency-users', '/patients', '/documents', '/ai-analyzer', '/assigned-audit-reports'].includes(item.path);
     }
     return user && item.roles.includes(user.role);
   });

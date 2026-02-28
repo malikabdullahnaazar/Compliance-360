@@ -366,6 +366,7 @@ class AIAnalysisResult(models.Model):
     )
 
     ai_model_used = models.CharField(max_length=100, default='open-mistral-nemo')
+    status = models.CharField(max_length=10, choices=[('Pass', 'Pass'), ('Fail', 'Fail')], default='Fail')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -373,3 +374,55 @@ class AIAnalysisResult(models.Model):
 
     def __str__(self):
         return f"AI Analysis – {self.patient} – {self.created_at.date()}"
+
+
+class AssignedAuditReport(models.Model):
+    """
+    Tracks an AI analysis result assigned by an agency admin to a clinician.
+    Also holds an optional uploaded document and completion status.
+    """
+    STATUS_CHOICES = [
+        ('incomplete', 'Incomplete'),
+        ('complete', 'Complete'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    analysis_result = models.ForeignKey(
+        AIAnalysisResult,
+        on_delete=models.CASCADE,
+        related_name='assignments',
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_reports',
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='received_reports',
+    )
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='incomplete')
+
+    # Uploaded document by admin after assignment
+    uploaded_document = models.FileField(
+        upload_to='assigned_report_docs/',
+        null=True,
+        blank=True,
+    )
+    uploaded_document_name = models.CharField(max_length=255, blank=True)
+
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-assigned_at']
+
+    def __str__(self):
+        return f"Assignment – {self.analysis_result} → {self.assigned_to}"
