@@ -105,56 +105,11 @@ const mdComponents = {
         </td>
     ),
     // Links (handling custom doc:id scheme)
-    a: ({ href, children }) => {
-        const isDoc = href && href.startsWith('doc:');
-
-        const handleClick = async (e) => {
-            if (isDoc) {
-                e.preventDefault();
-                e.stopPropagation();
-                const docId = href.slice(4); // strip 'doc:' prefix safely
-                try {
-                    const response = await documentService.downloadDocument(docId);
-                    // Use content-type from response headers, default to PDF
-                    const contentType =
-                        response.headers?.['content-type'] ||
-                        response.headers?.get?.('content-type') ||
-                        'application/pdf';
-                    const blob = new Blob([response.data], { type: contentType });
-                    const url = window.URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                    // Revoke object URL after a short delay to free memory
-                    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
-                } catch (error) {
-                    console.error('Failed to open document', error);
-                    alert('Failed to open document. Please try again.');
-                }
-            }
-        };
-
-        if (isDoc) {
-            return (
-                <button
-                    type="button"
-                    onClick={handleClick}
-                    className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline font-medium cursor-pointer"
-                >
-                    {children}
-                </button>
-            );
-        }
-
-        return (
-            <a
-                href={href}
-                className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline font-medium cursor-pointer"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                {children}
-            </a>
-        );
-    },
+    a: ({ children }) => (
+        <span className="font-semibold text-gray-900 dark:text-white">
+            {children}
+        </span>
+    ),
 };
 
 /* ─── SearchablePatientSelect ─────────────────────────────────────────────── */

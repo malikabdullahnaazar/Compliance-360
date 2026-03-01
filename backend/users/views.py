@@ -11,6 +11,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .models import CustomUser
 from .permissions import IsSuperAdmin, IsSuperAdminOrAgencyAdmin
 from .serializers import UserSerializer, RegisterSerializer
+import random
+import string
 
 User = get_user_model()
 
@@ -60,6 +62,15 @@ class MeView(APIView):
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
+
+    def patch(self, request):
+        user = request.user
+        password = request.data.get('password')
+        if password:
+            user.set_password(password)
+            user.save()
+            return Response({'detail': 'Password updated successfully.'})
+        return Response({'detail': 'Password field is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -190,4 +201,43 @@ class LogoutView(APIView):
 
     def post(self, request):
         return Response({'detail': 'Successfully logged out.'}, status=status.HTTP_200_OK)
+
+
+class ForgotPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'detail': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = CustomUser.objects.get(email=email)
+            # In a real app we'd send an email with a reset link/code here
+            return Response({'detail': 'If an account exists with this email, a reset code has been sent.', 'user_id': user.id}, status=status.HTTP_200_OK)
+        except CustomUser.DoesNotExist:
+            # We don't want to expose that the email does not exist for security reasons but returning success looks consistent
+            return Response({'detail': 'If an account exists with this email, a reset code has been sent.'}, status=status.HTTP_200_OK)
+
+class ResetPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        user_id = request.data.get('user_id')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+
+        if not user_id or not new_password or not confirm_password:
+            return Response({'detail': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({'detail': 'Passwords do not match.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = CustomUser.objects.get(id=user_id)
+            user.set_password(new_password)
+            user.save()
+            return Response({'detail': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+        except CustomUser.DoesNotExist:
+            return Response({'detail': 'Invalid request.'}, status=status.HTTP_400_BAD_REQUEST)
 

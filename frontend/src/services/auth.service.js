@@ -34,10 +34,16 @@ const getCurrentUser = async () => {
     return response.data;
 };
 
+const changePassword = async (password) => {
+    const response = await api.patch('auth/me/', { password });
+    return response.data;
+};
+
 const authService = {
     login,
     logout,
     getCurrentUser,
+    changePassword,
 };
 
 export default authService;

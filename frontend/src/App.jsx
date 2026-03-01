@@ -13,6 +13,8 @@ import NewPatientForm from './pages/NewPatientForm';
 import PatientDetailsPage from './pages/PatientDetailsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import AiAnalyzerPage from './pages/AiAnalyzerPage';
 import AiReportDetailPage from './pages/AiReportDetailPage';
 import AssignedAuditReportsPage from './pages/AssignedAuditReportsPage';
@@ -39,6 +41,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/dashboard"
         element={

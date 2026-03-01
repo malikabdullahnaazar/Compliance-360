@@ -15,16 +15,21 @@ import {
   X,
   Brain,
   ClipboardList,
+  Settings,
 } from 'lucide-react';
 import { addToast } from '../../store/slices/uiSlice';
 import AuthContext from '../../context/AuthContext';
 import { useContext } from 'react';
+import authService from '../../services/auth.service';
 
 import LogoutModal from '../common/LogoutModal';
+import ResetPasswordModal from '../common/ResetPasswordModal';
 
 const Sidebar = ({ onToggle, isOpen, onClose }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -51,6 +56,41 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       dispatch(addToast({ type: 'error', message: 'Failed to logout.' }));
     }
     setIsLogoutModalOpen(false);
+  };
+
+  const handleSettingsClick = () => {
+    setIsResetPasswordModalOpen(true);
+  };
+
+  const handleConfirmResetPassword = async (newPassword) => {
+    setIsSubmittingPassword(true);
+    try {
+      await authService.changePassword(newPassword);
+      dispatch(addToast({ type: 'success', message: 'Password updated successfully.' }));
+      setIsResetPasswordModalOpen(false);
+    } catch (error) {
+      dispatch(addToast({
+        type: 'error',
+        message: error.response?.data?.detail || 'Failed to update password.'
+      }));
+    } finally {
+      setIsSubmittingPassword(false);
+    }
+  };
+
+  const getRoleDisplayName = (role) => {
+    switch (role) {
+      case 'superadmin':
+        return 'Super Admin';
+      case 'agency_admin':
+        return 'Agency Admin';
+      case 'clinician':
+        return 'Clinician';
+      case 'qa_compliance':
+        return 'QA/Compliance Officer';
+      default:
+        return 'Compliance 360';
+    }
   };
 
   const menuItems = [
@@ -158,7 +198,7 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
           <div className="flex h-16 items-center justify-between border-b border-gray-200 dark:border-gray-800 px-4">
             {!isCollapsed && (
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {user?.role === 'superadmin' ? 'Super Admin' : 'Compliance 360'}
+                {getRoleDisplayName(user?.role)}
               </h2>
             )}
             <div className="flex items-center gap-1">
@@ -214,16 +254,29 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
             })}
           </nav>
 
-          <div className="border-t border-gray-200 dark:border-gray-800 p-3">
+          <div className="border-t border-gray-200 dark:border-gray-800 p-3 space-y-1">
+            <button
+              type="button"
+              onClick={handleSettingsClick}
+              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white cursor-pointer ${isCollapsed ? 'justify-center' : ''
+                }`}
+              title={isCollapsed ? 'Settings' : undefined}
+            >
+              <Settings
+                className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300"
+                aria-hidden="true"
+              />
+              {!isCollapsed && <span>Settings</span>}
+            </button>
             <button
               type="button"
               onClick={handleLogoutClick}
-              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white cursor-pointer ${isCollapsed ? 'justify-center' : ''
+              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-gray-300 dark:hover:bg-red-900/30 dark:hover:text-red-400 cursor-pointer ${isCollapsed ? 'justify-center' : ''
                 }`}
               title={isCollapsed ? 'Logout' : undefined}
             >
               <LogOut
-                className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300"
+                className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-red-500 dark:text-gray-400 dark:group-hover:text-red-400"
                 aria-hidden="true"
               />
               {!isCollapsed && <span>Logout</span>}
@@ -234,6 +287,12 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
           isOpen={isLogoutModalOpen}
           onClose={() => setIsLogoutModalOpen(false)}
           onConfirm={alignConfirmLogout}
+        />
+        <ResetPasswordModal
+          isOpen={isResetPasswordModalOpen}
+          onClose={() => setIsResetPasswordModalOpen(false)}
+          onConfirm={handleConfirmResetPassword}
+          submitting={isSubmittingPassword}
         />
       </aside>
     </>

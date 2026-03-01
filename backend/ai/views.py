@@ -889,6 +889,89 @@ class MistralAnalyzeView(viewsets.ViewSet):
             'document_names': [d['filename'] for d in documents_data],
         }, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], url_path='analyze_assignment')
+    def analyze_assignment(self, request):
+        """
+        Accepts: { assignment_id: str }
+        Reads the uploaded clinician document, extracts text, calls Mistral analysis, and returns Markdown report.
+        """
+        from .services.mistral_service import get_mistral_service
+        from documents.services import get_document_processor
+
+        assignment_id = request.data.get('assignment_id')
+        if not assignment_id:
+            return Response({'error': 'assignment_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            assignment = AssignedAuditReport.objects.select_related('analysis_result__patient').get(id=assignment_id)
+        except AssignedAuditReport.DoesNotExist:
+            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if not assignment.uploaded_document:
+            return Response({'error': 'No document uploaded for this assignment'}, status=status.HTTP_400_BAD_REQUEST)
+
+        patient = assignment.analysis_result.patient
+
+        # Process / extract text from the document
+        processor = get_document_processor()
+        try:
+            assignment.uploaded_document.seek(0)
+            file_bytes = assignment.uploaded_document.read()
+            processed_doc = processor.process_bytes(
+                file_bytes=file_bytes,
+                filename=assignment.uploaded_document_name,
+                document_type='other'
+            )
+            extracted_text = processed_doc['content']
+        except Exception as e:
+            return Response({'error': f'Failed to process document: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        patient_info = {
+            'patient_id': str(patient.id),
+            'first_name': patient.first_name,
+            'last_name': patient.last_name,
+        }
+
+        documents_data = [
+            {
+                'filename': assignment.uploaded_document_name,
+                'document_type': 'clinician_submitted',
+                'document_type_display': 'Clinician Submitted Document',
+                'extracted_text': extracted_text or '[No text extracted]',
+            }
+        ]
+
+        try:
+            service = get_mistral_service()
+            report_markdown = service.analyze_documents(
+                documents=documents_data,
+                patient_info=patient_info,
+            )
+            import re
+            from datetime import datetime
+            current_date_str = datetime.now().strftime("%B %d, %Y")
+            date_pattern = re.compile(
+                r'\[(?:Date|Current\s+Date|Audit\s+Date|date|current\s+date|TODAY)\]',
+                re.IGNORECASE
+            )
+            report_markdown = date_pattern.sub(current_date_str, report_markdown)
+            
+            iso_pattern = re.compile(
+                r'\[(?:ISO timestamp|Current ISO timestamp)\]',
+                re.IGNORECASE
+            )
+            report_markdown = iso_pattern.sub(datetime.now().isoformat(), report_markdown)
+
+        except Exception as exc:
+            logger.error(f'Mistral analysis failed: {exc}')
+            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'report_markdown': report_markdown,
+            'patient_info': patient_info,
+            'document_names': [assignment.uploaded_document_name],
+        }, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'], url_path='save')
     def save_result(self, request):
         """

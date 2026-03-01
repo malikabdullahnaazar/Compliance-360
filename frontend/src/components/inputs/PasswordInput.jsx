@@ -9,6 +9,7 @@ const PasswordInput = forwardRef(
       label = 'Password',
       error,
       className,
+      wrapperClassName,
       ...props
     },
     ref,
@@ -16,7 +17,7 @@ const PasswordInput = forwardRef(
     const [show, setShow] = useState(false);
 
     return (
-      <div className={cn('mb-4', className)}>
+      <div className={cn('mb-4', className, wrapperClassName)}>
         {label && (
           <label
             htmlFor={id}

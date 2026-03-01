@@ -22,6 +22,7 @@ import api from '../services/api';
 const fetchResultDetail = (id) => api.get(`/ai/mistral/results/${id}/detail/`);
 const fetchClinicians = () => api.get('/ai/mistral/clinicians/');
 const assignReport = (payload) => api.post('/ai/mistral/assign/', payload);
+const saveResult = (payload) => api.post('/ai/mistral/save/', payload);
 
 // Download clinician document via the AssignedAuditReport download endpoint
 const downloadAssignmentDoc = (assignmentId) =>
@@ -93,50 +94,11 @@ const mdComponents = {
             {children}
         </td>
     ),
-    a: ({ href, children }) => {
-        const isDoc = href && href.startsWith('doc:');
-        const handleClick = async (e) => {
-            if (isDoc) {
-                e.preventDefault();
-                e.stopPropagation();
-                const docId = href.slice(4);
-                try {
-                    const response = await documentService.downloadDocument(docId);
-                    const contentType =
-                        response.headers?.['content-type'] ||
-                        response.headers?.get?.('content-type') ||
-                        'application/pdf';
-                    const blob = new Blob([response.data], { type: contentType });
-                    const url = window.URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
-                } catch {
-                    alert('Failed to open document. Please try again.');
-                }
-            }
-        };
-        if (isDoc) {
-            return (
-                <button
-                    type="button"
-                    onClick={handleClick}
-                    className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline font-medium cursor-pointer"
-                >
-                    {children}
-                </button>
-            );
-        }
-        return (
-            <a
-                href={href}
-                className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline font-medium cursor-pointer"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                {children}
-            </a>
-        );
-    },
+    a: ({ children }) => (
+        <span className="font-semibold text-gray-900 dark:text-white">
+            {children}
+        </span>
+    ),
 };
 
 /* ─── Document Action Row ─────────────────────────────────────────────────── */
@@ -180,7 +142,8 @@ const DocumentRow = ({ doc, onView, onDownload }) => (
 );
 
 /* ─── Clinician Doc Row (submission read-only) ────────────────────────────── */
-const ClinicianDocRow = ({ name, submittedAt, clinicianName, onView, onDownload }) => (
+/* ─── Clinician Document Action Row ───────────────────────────────────────── */
+const ClinicianDocRow = ({ name, submittedAt, clinicianName, onView, onDownload, onAnalyze }) => (
     <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800/50 rounded-xl border border-emerald-200 dark:border-emerald-800 transition-colors">
         <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
             <FileCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -193,6 +156,18 @@ const ClinicianDocRow = ({ name, submittedAt, clinicianName, onView, onDownload 
             </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+            {onAnalyze && (
+                <button
+                    onClick={onAnalyze}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                        bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300
+                        hover:bg-teal-100 dark:hover:bg-teal-900/50 border border-teal-200 dark:border-teal-800
+                        transition-colors cursor-pointer mr-1"
+                >
+                    <Cpu className="h-3.5 w-3.5" />
+                    Analyze
+                </button>
+            )}
             <button
                 onClick={onView}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
@@ -213,6 +188,94 @@ const ClinicianDocRow = ({ name, submittedAt, clinicianName, onView, onDownload 
                 <Download className="h-3.5 w-3.5" />
                 Download
             </button>
+        </div>
+    </div>
+);
+
+/* ─── Full-screen "Analyzing…" overlay ───────────────────────────────────── */
+const AnalyzingOverlay = () => (
+    /* z-[200] → always above the Navbar (z-50) */
+    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-gray-900/80 backdrop-blur-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-10
+      flex flex-col items-center gap-6 max-w-sm w-full mx-4">
+            <div className="relative flex items-center justify-center">
+                <div className="absolute h-20 w-20 rounded-full border-4 border-teal-500/30 animate-ping" />
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-teal-400 to-indigo-500
+          flex items-center justify-center shadow-lg">
+                    <Brain className="h-8 w-8 text-white animate-pulse" />
+                </div>
+            </div>
+            <div className="text-center">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight mb-2">
+                    Analyzing Document…
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-[260px] mx-auto">
+                    The AI is currently processing the submitted clinician document.
+                    This usually takes 10 to 30 seconds.
+                </p>
+            </div>
+            {/* Minimal progress bar effect */}
+            <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mt-2">
+                <div className="h-full bg-teal-500 rounded-full animate-[progress_2s_ease-in-out_infinite]"
+                    style={{ width: '40%', transformOrigin: '0% 50%' }}
+                />
+            </div>
+        </div>
+    </div>
+);
+
+/* ─── ResultModal – shows the newly generated report ─────────────────────── */
+const ResultModal = ({ result, onClose, mdComponents }) => (
+    <div className="fixed inset-0 z-[200] flex flex-col">
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={onClose} />
+
+        {/* Dialog – centred but pushed below navbar height (64px / pt-16) */}
+        <div className="relative flex-1 flex items-center justify-center p-4 pt-20">
+            <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl
+        flex flex-col w-full max-w-5xl"
+                style={{ maxHeight: 'calc(100vh - 96px)' }}
+            >
+                {/* Modal header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b
+          border-gray-200 dark:border-gray-700 flex-shrink-0 rounded-t-2xl">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30
+              flex items-center justify-center">
+                            <Brain className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                                AI Compliance Audit Report
+                            </h2>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Generated by Mistral · {result.ai_model}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100
+              dark:hover:bg-gray-800 transition-colors"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto px-6 py-6 border-b border-gray-200 dark:border-gray-800">
+                    <div className="prose prose-sm prose-gray dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={mdComponents}>
+                            {result.report_markdown}
+                        </ReactMarkdown>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 flex flex-shrink-0 justify-end gap-3 rounded-b-2xl bg-gray-50 dark:bg-gray-800/20">
+                    <Button variant="primary" onClick={onClose} className="px-6">Close</Button>
+                </div>
+            </div>
         </div>
     </div>
 );
@@ -314,6 +377,10 @@ const AiReportDetailPage = () => {
 
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    /* Analysis state */
+    const [analyzing, setAnalyzing] = useState(false);
+    const [pendingResult, setPendingResult] = useState(null);
 
     /* Assign modal */
     const [clinicians, setClinicians] = useState([]);
@@ -439,6 +506,56 @@ const AiReportDetailPage = () => {
             dispatch(addToast({ type: 'error', message: err?.response?.data?.error || 'Failed to assign report' }));
         } finally {
             setAssigning(false);
+        }
+    };
+
+    const handleAnalyzeClinicianDocument = async () => {
+        if (!result?.clinician_assignment_id) return;
+        setAnalyzing(true);
+        try {
+            const res = await api.post('/ai/mistral/analyze_assignment/', {
+                assignment_id: result.clinician_assignment_id
+            });
+            const analysisData = res.data;
+
+            let docStatus = 'Fail';
+            const findingsMatch = analysisData.report_markdown.match(/Total\s+Findings\D*(\d+)/i);
+            if (findingsMatch) {
+                docStatus = parseInt(findingsMatch[1], 10) === 0 ? 'Pass' : 'Fail';
+            } else {
+                const scoreMatch = analysisData.report_markdown.match(/Compliance\s+Score\s*:\s*(\d+)\s*\/\s*100/i);
+                if (scoreMatch) {
+                    docStatus = parseInt(scoreMatch[1], 10) >= 85 ? 'Pass' : 'Fail';
+                } else {
+                    const riskMatch = analysisData.report_markdown.match(/Overall\s+Risk\s+Level\s*:.*?(CRITICAL|HIGH|MEDIUM|LOW|NONE)/i);
+                    if (riskMatch && (riskMatch[1].toUpperCase() === 'LOW' || riskMatch[1].toUpperCase() === 'NONE')) {
+                        docStatus = 'Pass';
+                    }
+                }
+            }
+
+            const saveRes = await saveResult({
+                patient_id: analysisData.patient_info.patient_id,
+                report_markdown: analysisData.report_markdown,
+                document_names: analysisData.document_names,
+                ai_model_used: 'open-mistral-nemo',
+                status: docStatus,
+            });
+
+            setPendingResult({
+                id: saveRes.data.id,
+                patient_name: `${analysisData.patient_info.first_name} ${analysisData.patient_info.last_name}`,
+                report_markdown: analysisData.report_markdown,
+                ai_model: 'open-mistral-nemo',
+            });
+
+            dispatch(addToast({ type: 'success', message: 'Report generated and saved automatically.' }));
+
+        } catch (error) {
+            console.error(error);
+            dispatch(addToast({ type: 'error', message: 'Analysis failed. Make sure the document is a valid format.' }));
+        } finally {
+            setAnalyzing(false);
         }
     };
 
@@ -668,6 +785,7 @@ const AiReportDetailPage = () => {
                                             clinicianName={result.clinician_name}
                                             onView={handleViewClinicianDoc}
                                             onDownload={handleDownloadClinicianDoc}
+                                            onAnalyze={handleAnalyzeClinicianDocument}
                                         />
                                     </>
                                 ) : (
@@ -782,6 +900,17 @@ const AiReportDetailPage = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            {/* ── Overlay ── */}
+            {analyzing && <AnalyzingOverlay />}
+
+            {/* ── Result Modal ── */}
+            {pendingResult && (
+                <ResultModal
+                    result={pendingResult}
+                    onClose={() => setPendingResult(null)}
+                    mdComponents={mdComponents}
+                />
             )}
         </div>
     );

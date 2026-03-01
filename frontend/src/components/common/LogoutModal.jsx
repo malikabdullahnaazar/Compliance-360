@@ -31,7 +31,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
                         <LogOut className="h-6 w-6 text-red-600 dark:text-red-400" />
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Are you sure you want to log out of your account? You will need to sign in again to access your dashboard.
+                        Are you sure you want to log out of your account?
                     </p>
                 </div>
 
