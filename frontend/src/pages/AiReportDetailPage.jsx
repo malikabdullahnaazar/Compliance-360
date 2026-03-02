@@ -584,335 +584,343 @@ const AiReportDetailPage = () => {
                 <Navbar variant="app" onMenuToggle={() => setIsMobileMenuOpen(p => !p)} />
 
                 <div className="mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-5xl">
+                    <Card className="bg-white dark:bg-gray-900 border-none shadow-xl ring-1 ring-gray-200 dark:ring-gray-800 p-6 sm:p-8">
+                        <CardContent className="p-0 space-y-8">
+                            {/* ── Back button ── */}
+                            <button
+                                onClick={handleBack}
+                                className="flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-5 transition-colors"
+                            >
+                                <ArrowLeft className="h-4 w-4 mr-1" />
+                                Back to Results
+                            </button>
 
-                    {/* ── Back button ── */}
-                    <button
-                        onClick={handleBack}
-                        className="flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-5 transition-colors"
-                    >
-                        <ArrowLeft className="h-4 w-4 mr-1" />
-                        Back to Results
-                    </button>
+                            {/* ── Page header ── */}
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-7">
+                                <div className="flex items-start gap-3">
+                                    <div className="h-11 w-11 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <Brain className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight">
+                                            AI Compliance Audit Report
+                                        </h1>
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{result.patient_name}</span>
+                                            <span className="text-gray-300 dark:text-gray-600">·</span>
+                                            <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                                <Calendar className="h-3.5 w-3.5" />
+                                                {new Date(result.created_at).toLocaleString()}
+                                            </span>
+                                            <span className="text-gray-300 dark:text-gray-600">·</span>
+                                            <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                                <Cpu className="h-3.5 w-3.5" />
+                                                {result.ai_model_used}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                    {/* ── Page header ── */}
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-7">
-                        <div className="flex items-start gap-3">
-                            <div className="h-11 w-11 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <Brain className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight">
-                                    AI Compliance Audit Report
-                                </h1>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                                    <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{result.patient_name}</span>
-                                    <span className="text-gray-300 dark:text-gray-600">·</span>
-                                    <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                                        <Calendar className="h-3.5 w-3.5" />
-                                        {new Date(result.created_at).toLocaleString()}
+                                {/* Action badges */}
+                                <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                                    {/* Doc status */}
+                                    {!isPassed && (
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border
+                                    ${isDocSubmitted
+                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                                : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                            }`}>
+                                            {isDocSubmitted
+                                                ? <><FileCheck className="h-3.5 w-3.5" /> Document Submitted</>
+                                                : <><Clock className="h-3.5 w-3.5" /> Document Pending</>
+                                            }
+                                        </span>
+                                    )}
+
+                                    {/* Pass/Fail status */}
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border
+                                ${isPassed
+                                            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
+                                            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+                                        }`}>
+                                        {isPassed
+                                            ? <><CheckCircle className="h-3.5 w-3.5" /> Pass</>
+                                            : <><XCircle className="h-3.5 w-3.5" /> Fail</>
+                                        }
                                     </span>
-                                    <span className="text-gray-300 dark:text-gray-600">·</span>
-                                    <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                                        <Cpu className="h-3.5 w-3.5" />
-                                        {result.ai_model_used}
-                                    </span>
+
+                                    {/* Assign button (only Fail reports) */}
+                                    {!isPassed && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!result.is_assigned) {
+                                                    setShowAssignDropdown(true);
+                                                    setShowConfirmAssign(false);
+                                                    setSelectedClinician('');
+                                                }
+                                            }}
+                                            disabled={result.is_assigned}
+                                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors
+                                        ${result.is_assigned
+                                                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+                                                    : 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 border-teal-200 dark:border-teal-800 cursor-pointer'
+                                                }`}
+                                            title={result.is_assigned ? 'Already assigned' : 'Assign to a clinician'}
+                                        >
+                                            {result.is_assigned
+                                                ? <><CheckCircle className="h-4 w-4" /> Assigned</>
+                                                : <><UserCheck className="h-4 w-4" /> Assign</>
+                                            }
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Action badges */}
-                        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-                            {/* Doc status */}
-                            {!isPassed && (
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border
-                                    ${isDocSubmitted
-                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                        : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                                    }`}>
-                                    {isDocSubmitted
-                                        ? <><FileCheck className="h-3.5 w-3.5" /> Document Submitted</>
-                                        : <><Clock className="h-3.5 w-3.5" /> Document Pending</>
-                                    }
-                                </span>
-                            )}
-
-                            {/* Pass/Fail status */}
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border
-                                ${isPassed
-                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
-                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-                                }`}>
-                                {isPassed
-                                    ? <><CheckCircle className="h-3.5 w-3.5" /> Pass</>
-                                    : <><XCircle className="h-3.5 w-3.5" /> Fail</>
-                                }
-                            </span>
-
-                            {/* Assign button (only Fail reports) */}
-                            {!isPassed && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (!result.is_assigned) {
-                                            setShowAssignDropdown(true);
-                                            setShowConfirmAssign(false);
-                                            setSelectedClinician('');
-                                        }
-                                    }}
-                                    disabled={result.is_assigned}
-                                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors
-                                        ${result.is_assigned
-                                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 cursor-not-allowed'
-                                            : 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 border-teal-200 dark:border-teal-800 cursor-pointer'
-                                        }`}
-                                    title={result.is_assigned ? 'Already assigned' : 'Assign to a clinician'}
-                                >
-                                    {result.is_assigned
-                                        ? <><CheckCircle className="h-4 w-4" /> Assigned</>
-                                        : <><UserCheck className="h-4 w-4" /> Assign</>
-                                    }
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ══════════════════════════════════════════════════════════
+                            {/* ══════════════════════════════════════════════════════════
                         SECTION 1 – AI-Analyzed Source Documents
                     ══════════════════════════════════════════════════════════ */}
-                    <Card className="mb-6 border border-gray-200 dark:border-gray-800 shadow-sm">
-                        <CardHeader className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 py-3 px-5">
-                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <FolderOpen className="h-4 w-4 text-teal-500" />
-                                AI-Analyzed Source Documents
-                            </h2>
-                        </CardHeader>
-                        <CardContent className="p-5">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-                                These are the clinical documents that were submitted to the AI for compliance analysis.
-                            </p>
+                            <Card className="mb-6 border border-gray-200 dark:border-gray-800 shadow-sm">
+                                <CardHeader className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 py-3 px-5">
+                                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <FolderOpen className="h-4 w-4 text-teal-500" />
+                                        AI-Analyzed Source Documents
+                                    </h2>
+                                </CardHeader>
+                                <CardContent className="p-5">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+                                        These are the clinical documents that were submitted to the AI for compliance analysis.
+                                    </p>
 
-                            {result.analyzed_documents && result.analyzed_documents.length > 0 ? (
-                                <>
-                                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
-                                        {result.analyzed_documents.length} file{result.analyzed_documents.length !== 1 ? 's' : ''}
-                                    </p>
-                                    <div className="space-y-2">
-                                        {result.analyzed_documents.map(doc => (
-                                            <DocumentRow
-                                                key={doc.id}
-                                                doc={doc}
-                                                onView={handleViewDoc}
-                                                onDownload={handleDownloadDoc}
-                                            />
-                                        ))}
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
-                                        {result.analyzed_document_names?.length ?? 0} file{(result.analyzed_document_names?.length ?? 0) !== 1 ? 's' : ''}
-                                    </p>
-                                    <div className="space-y-2">
-                                        {(result.analyzed_document_names ?? []).map((name, i) => (
-                                            <div key={i} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                                <div className="h-9 w-9 rounded-lg bg-gray-50 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-                                                    <FileText className="h-4 w-4 text-gray-400" />
-                                                </div>
-                                                <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{name}</p>
+                                    {result.analyzed_documents && result.analyzed_documents.length > 0 ? (
+                                        <>
+                                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
+                                                {result.analyzed_documents.length} file{result.analyzed_documents.length !== 1 ? 's' : ''}
+                                            </p>
+                                            <div className="space-y-2">
+                                                {result.analyzed_documents.map(doc => (
+                                                    <DocumentRow
+                                                        key={doc.id}
+                                                        doc={doc}
+                                                        onView={handleViewDoc}
+                                                        onDownload={handleDownloadDoc}
+                                                    />
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3">
+                                                {result.analyzed_document_names?.length ?? 0} file{(result.analyzed_document_names?.length ?? 0) !== 1 ? 's' : ''}
+                                            </p>
+                                            <div className="space-y-2">
+                                                {(result.analyzed_document_names ?? []).map((name, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                                        <div className="h-9 w-9 rounded-lg bg-gray-50 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                                                            <FileText className="h-4 w-4 text-gray-400" />
+                                                        </div>
+                                                        <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{name}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
 
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-4 leading-relaxed border-t border-gray-100 dark:border-gray-800 pt-4">
-                                These documents were used as the source data for the AI compliance analysis report below.
-                            </p>
-                        </CardContent>
-                    </Card>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-4 leading-relaxed border-t border-gray-100 dark:border-gray-800 pt-4">
+                                        These documents were used as the source data for the AI compliance analysis report below.
+                                    </p>
+                                </CardContent>
+                            </Card>
 
-                    {/* ══════════════════════════════════════════════════════════
+                            {/* ══════════════════════════════════════════════════════════
                         SECTION 2 – AI Compliance Report
                     ══════════════════════════════════════════════════════════ */}
-                    <Card className="mb-6 border border-gray-200 dark:border-gray-800 shadow-sm">
-                        <CardHeader className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 py-3 px-5">
-                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <Brain className="h-4 w-4 text-indigo-500" />
-                                AI Compliance Analysis Report
-                            </h2>
-                        </CardHeader>
-                        <CardContent className="p-6 sm:p-8">
-                            <div className="prose prose-sm prose-gray dark:prose-invert max-w-none">
-                                <ReactMarkdown remarkPlugins={MD_PLUGINS} components={mdComponents}>
-                                    {result.report_markdown}
-                                </ReactMarkdown>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            <Card className="mb-6 border border-gray-200 dark:border-gray-800 shadow-sm">
+                                <CardHeader className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 py-3 px-5">
+                                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <Brain className="h-4 w-4 text-indigo-500" />
+                                        AI Compliance Analysis Report
+                                    </h2>
+                                </CardHeader>
+                                <CardContent className="p-6 sm:p-8">
+                                    <div className="prose prose-sm prose-gray dark:prose-invert max-w-none">
+                                        <ReactMarkdown remarkPlugins={MD_PLUGINS} components={mdComponents}>
+                                            {result.report_markdown}
+                                        </ReactMarkdown>
+                                    </div>
+                                </CardContent>
+                            </Card>
 
-                    {/* ══════════════════════════════════════════════════════════
+                            {/* ══════════════════════════════════════════════════════════
                         SECTION 3 – Clinician Submitted Document (read-only)
                     ══════════════════════════════════════════════════════════ */}
-                    {!isPassed && (
-                        <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
-                            <CardHeader className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 py-3 px-5">
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <FileCheck className="h-4 w-4 text-indigo-500" />
-                                        Clinician Submitted Document
-                                    </h2>
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border
+                            {!isPassed && (
+                                <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+                                    <CardHeader className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 py-3 px-5">
+                                        <div className="flex items-center justify-between">
+                                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                                <FileCheck className="h-4 w-4 text-indigo-500" />
+                                                Clinician Submitted Document
+                                            </h2>
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border
                                         ${isDocSubmitted
-                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                            : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                                        }`}>
-                                        {isDocSubmitted
-                                            ? <><FileCheck className="h-3 w-3" /> Submitted</>
-                                            : <><Clock className="h-3 w-3" /> Pending</>
-                                        }
-                                    </span>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-5">
-                                {isDocSubmitted && result.has_clinician_document ? (
-                                    <>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
-                                            The clinician has reviewed and submitted the following document in response to this compliance audit report.
-                                        </p>
-                                        <ClinicianDocRow
-                                            name={result.clinician_document_name}
-                                            submittedAt={result.clinician_document_submitted_at}
-                                            clinicianName={result.clinician_name}
-                                            onView={handleViewClinicianDoc}
-                                            onDownload={handleDownloadClinicianDoc}
-                                            onAnalyze={handleAnalyzeClinicianDocument}
-                                        />
-                                    </>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                                        <div className="h-14 w-14 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mb-3">
-                                            <Clock className="h-7 w-7 text-amber-500 dark:text-amber-400" />
+                                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                                    : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                                }`}>
+                                                {isDocSubmitted
+                                                    ? <><FileCheck className="h-3 w-3" /> Submitted</>
+                                                    : <><Clock className="h-3 w-3" /> Pending</>
+                                                }
+                                            </span>
                                         </div>
-                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                                            No Document Submitted Yet
-                                        </p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">
-                                            The assigned clinician has not submitted a document for this report yet.
-                                            The status will update to "Document Submitted" once they upload one from their assigned reports.
-                                        </p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-
+                                    </CardHeader>
+                                    <CardContent className="p-5">
+                                        {isDocSubmitted && result.has_clinician_document ? (
+                                            <>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
+                                                    The clinician has reviewed and submitted the following document in response to this compliance audit report.
+                                                </p>
+                                                <ClinicianDocRow
+                                                    name={result.clinician_document_name}
+                                                    submittedAt={result.clinician_document_submitted_at}
+                                                    clinicianName={result.clinician_name}
+                                                    onView={handleViewClinicianDoc}
+                                                    onDownload={handleDownloadClinicianDoc}
+                                                    onAnalyze={handleAnalyzeClinicianDocument}
+                                                />
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                                <div className="h-14 w-14 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mb-3">
+                                                    <Clock className="h-7 w-7 text-amber-500 dark:text-amber-400" />
+                                                </div>
+                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                                    No Document Submitted Yet
+                                                </p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">
+                                                    The assigned clinician has not submitted a document for this report yet.
+                                                    The status will update to "Document Submitted" once they upload one from their assigned reports.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 
             {/* ── Assign Clinician Modal ── */}
-            {showAssignDropdown && !showConfirmAssign && (
-                <div className="fixed inset-0 z-[300] flex items-center justify-center">
-                    <div
-                        className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
-                        onClick={() => { setShowAssignDropdown(false); setSelectedClinician(''); }}
-                    />
-                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="h-10 w-10 rounded-xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center flex-shrink-0">
-                                <UserCheck className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Assign Report to Clinician</h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {result.patient_name} &bull; {new Date(result.created_at).toLocaleDateString()}
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => { setShowAssignDropdown(false); setSelectedClinician(''); }}
-                                className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
-                        </div>
-
-                        {clinicians.length === 0 ? (
-                            <div className="py-6 text-center">
-                                <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                                <p className="text-sm text-gray-500">No clinicians found in your agency.</p>
-                                <p className="text-xs text-gray-400 mt-1">Create clinician users first from the Users section.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Select Clinician
-                                </label>
-                                <SearchableClinicianSelect
-                                    clinicians={clinicians}
-                                    value={selectedClinician}
-                                    onChange={setSelectedClinician}
-                                />
-                                <div className="flex gap-3 mt-5">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => { setShowAssignDropdown(false); setSelectedClinician(''); }}
-                                        className="flex-1"
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        variant="primary"
-                                        disabled={!selectedClinician}
-                                        onClick={() => setShowConfirmAssign(true)}
-                                        className="flex-1"
-                                    >
-                                        Continue
-                                    </Button>
+            {
+                showAssignDropdown && !showConfirmAssign && (
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center">
+                        <div
+                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+                            onClick={() => { setShowAssignDropdown(false); setSelectedClinician(''); }}
+                        />
+                        <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="h-10 w-10 rounded-xl bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center flex-shrink-0">
+                                    <UserCheck className="h-5 w-5 text-teal-600 dark:text-teal-400" />
                                 </div>
-                            </>
-                        )}
+                                <div>
+                                    <h3 className="text-base font-bold text-gray-900 dark:text-white">Assign Report to Clinician</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        {result.patient_name} &bull; {new Date(result.created_at).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => { setShowAssignDropdown(false); setSelectedClinician(''); }}
+                                    className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            {clinicians.length === 0 ? (
+                                <div className="py-6 text-center">
+                                    <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-sm text-gray-500">No clinicians found in your agency.</p>
+                                    <p className="text-xs text-gray-400 mt-1">Create clinician users first from the Users section.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Select Clinician
+                                    </label>
+                                    <SearchableClinicianSelect
+                                        clinicians={clinicians}
+                                        value={selectedClinician}
+                                        onChange={setSelectedClinician}
+                                    />
+                                    <div className="flex gap-3 mt-5">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => { setShowAssignDropdown(false); setSelectedClinician(''); }}
+                                            className="flex-1"
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            variant="primary"
+                                            disabled={!selectedClinician}
+                                            onClick={() => setShowConfirmAssign(true)}
+                                            className="flex-1"
+                                        >
+                                            Continue
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* ── Confirm Assignment Modal ── */}
-            {showConfirmAssign && (
-                <div className="fixed inset-0 z-[310] flex items-center justify-center">
-                    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowConfirmAssign(false)} />
-                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
-                        <div className="h-14 w-14 rounded-full bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center mx-auto mb-4">
-                            <ClipboardList className="h-7 w-7 text-teal-600 dark:text-teal-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Confirm Assignment</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                            Assign this report for{' '}
-                            <span className="font-semibold text-gray-800 dark:text-white">{result.patient_name}</span> to:
-                        </p>
-                        <p className="text-base font-bold text-teal-600 dark:text-teal-400 mb-5">
-                            {clinicians.find(c => c.id === selectedClinician)?.full_name}
-                        </p>
-                        <div className="flex gap-3">
-                            <Button variant="outline" onClick={() => setShowConfirmAssign(false)} disabled={assigning} className="flex-1">
-                                Cancel
-                            </Button>
-                            <Button variant="primary" onClick={handleConfirmAssign} disabled={assigning} className="flex-1">
-                                {assigning ? 'Assigning…' : 'OK, Assign'}
-                            </Button>
+            {
+                showConfirmAssign && (
+                    <div className="fixed inset-0 z-[310] flex items-center justify-center">
+                        <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowConfirmAssign(false)} />
+                        <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
+                            <div className="h-14 w-14 rounded-full bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center mx-auto mb-4">
+                                <ClipboardList className="h-7 w-7 text-teal-600 dark:text-teal-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Confirm Assignment</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                                Assign this report for{' '}
+                                <span className="font-semibold text-gray-800 dark:text-white">{result.patient_name}</span> to:
+                            </p>
+                            <p className="text-base font-bold text-teal-600 dark:text-teal-400 mb-5">
+                                {clinicians.find(c => c.id === selectedClinician)?.full_name}
+                            </p>
+                            <div className="flex gap-3">
+                                <Button variant="outline" onClick={() => setShowConfirmAssign(false)} disabled={assigning} className="flex-1">
+                                    Cancel
+                                </Button>
+                                <Button variant="primary" onClick={handleConfirmAssign} disabled={assigning} className="flex-1">
+                                    {assigning ? 'Assigning…' : 'OK, Assign'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
             {/* ── Overlay ── */}
             {analyzing && <AnalyzingOverlay />}
 
             {/* ── Result Modal ── */}
-            {pendingResult && (
-                <ResultModal
-                    result={pendingResult}
-                    onClose={() => setPendingResult(null)}
-                    mdComponents={mdComponents}
-                />
-            )}
-        </div>
+            {
+                pendingResult && (
+                    <ResultModal
+                        result={pendingResult}
+                        onClose={() => setPendingResult(null)}
+                        mdComponents={mdComponents}
+                    />
+                )
+            }
+        </div >
     );
 };
 
