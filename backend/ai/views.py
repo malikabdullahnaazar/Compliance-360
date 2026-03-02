@@ -421,7 +421,7 @@ class DocumentManagementViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
-    filterset_fields = ['document_type']
+    filterset_fields = ['document_type', 'patient']
     search_fields = ['filename']
     ordering_fields = ['filename', 'created_at', 'document_type']
     ordering = ['-created_at']

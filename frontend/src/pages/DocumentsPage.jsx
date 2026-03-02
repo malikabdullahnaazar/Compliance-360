@@ -19,6 +19,7 @@ import {
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import { documentService } from '../services/document.service';
+import { patientService } from '../services/patient.service';
 import { addToast } from '../store/slices/uiSlice';
 import { useDispatch } from 'react-redux';
 import Sidebar from '../components/layout/Sidebar';
@@ -38,6 +39,8 @@ const DocumentsPage = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [ordering, setOrdering] = useState('-created_at');
   const [typeFilter, setTypeFilter] = useState('');
+  const [patientFilter, setPatientFilter] = useState('');
+  const [patients, setPatients] = useState([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -52,7 +55,8 @@ const DocumentsPage = () => {
         page_size: pageSize,
         ordering: ordering,
         search: searchTerm,
-        document_type: typeFilter
+        document_type: typeFilter,
+        patient: patientFilter
       };
 
       const response = await documentService.getDocuments(params);
@@ -70,11 +74,28 @@ const DocumentsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, pageSize, ordering, searchTerm, typeFilter, dispatch]);
+  }, [currentPage, pageSize, ordering, searchTerm, typeFilter, patientFilter, dispatch]);
+
+  const fetchPatients = useCallback(async () => {
+    try {
+      const response = await patientService.getPatients({ page_size: 1000 });
+      if (response.data?.results) {
+        setPatients(response.data.results);
+      } else {
+        setPatients(Array.isArray(response.data) ? response.data : []);
+      }
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    }
+  }, []);
 
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  useEffect(() => {
+    fetchPatients();
+  }, [fetchPatients]);
 
   const handleSort = (field) => {
     if (ordering === field) {
@@ -222,6 +243,25 @@ const DocumentsPage = () => {
                           <option value="">All Types</option>
                           {documentTypes.map(type => (
                             <option key={type.value} value={type.value}>{type.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <select
+                          className="text-sm border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white p-2 outline-none focus:ring-2 focus:ring-teal-500/50"
+                          value={patientFilter}
+                          onChange={(e) => {
+                            setPatientFilter(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                        >
+                          <option value="">All Patients</option>
+                          {patients.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.first_name} {p.last_name}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -429,15 +469,15 @@ const DocumentsPage = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </div >
 
       {/* Delete Confirmation Modal */}
-      <Modal
+      < Modal
         isOpen={isDeleteModalOpen}
         onClose={() => !deleting && setIsDeleteModalOpen(false)}
         title="Delete Document"
         footer={
-          <div className="flex gap-3 w-full">
+          < div className="flex gap-3 w-full" >
             <Button
               variant="outline"
               className="flex-1"
@@ -454,7 +494,7 @@ const DocumentsPage = () => {
             >
               {deleting ? 'Deleting...' : 'Delete'}
             </Button>
-          </div>
+          </div >
         }
       >
         <div className="py-4">
@@ -466,8 +506,8 @@ const DocumentsPage = () => {
             This action cannot be undone and will remove the file from our servers permanently.
           </p>
         </div>
-      </Modal>
-    </div>
+      </Modal >
+    </div >
   );
 };
 
