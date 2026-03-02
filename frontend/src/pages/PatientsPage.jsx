@@ -156,10 +156,10 @@ const PatientsPage = () => {
                       New Patient
                     </Button>
                   </Link>
-                  <Button type="button" variant="outline" className="hidden sm:flex shadow-sm">
+                  {/* <Button type="button" variant="outline" className="hidden sm:flex shadow-sm">
                     <Download className="h-4 w-4 mr-2" />
                     Export
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
 

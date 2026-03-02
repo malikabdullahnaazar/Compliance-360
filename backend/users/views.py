@@ -92,7 +92,7 @@ class UserListView(generics.ListAPIView):
         user = self.request.user
         if getattr(user, 'role', None) == 'superadmin':
             return qs
-        elif getattr(user, 'role', None) == 'agency_admin':
+        elif getattr(user, 'role', None) in ['agency_admin', 'qa_compliance']:
             return qs.filter(agency=user.agency)
         return qs.none()
 
@@ -106,13 +106,13 @@ class UserCreateView(generics.CreateAPIView):
         user = request.user
         data = dict(request.data)
         
-        if getattr(user, 'role', None) == 'agency_admin':
+        if getattr(user, 'role', None) in ['agency_admin', 'qa_compliance']:
             data['agency'] = user.agency_id
             
             # Extract first element from lists since dict(QueryDict) creates lists
             role = data.get('role', [''])[0] if isinstance(data.get('role'), list) else data.get('role')
             if role not in ['qa_compliance', 'clinician']:
-                return Response({'detail': 'Agency admins can only create QA/Compliance Officers and Clinicians.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'detail': 'Agency admins and QA/Compliance Officers can only create QA/Compliance Officers and Clinicians.'}, status=status.HTTP_403_FORBIDDEN)
                 
         # Handle dict from QueryDict issue
         for key, value in data.items():
@@ -130,7 +130,7 @@ class UserCreateView(generics.CreateAPIView):
             password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
         
         # Pass password to serializer save method which will handle hashing
-        if getattr(user, 'role', None) == 'agency_admin':
+        if getattr(user, 'role', None) in ['agency_admin', 'qa_compliance']:
             created_user = serializer.save(password=password, agency=user.agency)
         else:
             created_user = serializer.save(password=password)
@@ -150,17 +150,17 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         user = self.request.user
         if getattr(user, 'role', None) == 'superadmin':
             return qs
-        elif getattr(user, 'role', None) == 'agency_admin':
+        elif getattr(user, 'role', None) in ['agency_admin', 'qa_compliance']:
             return qs.filter(agency=user.agency)
         return qs.none()
         
     def perform_update(self, serializer):
         user = self.request.user
-        if getattr(user, 'role', None) == 'agency_admin':
+        if getattr(user, 'role', None) in ['agency_admin', 'qa_compliance']:
             role = serializer.validated_data.get('role', self.get_object().role)
             if role not in ['qa_compliance', 'clinician']:
                 from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied("Agency admins can only manage QA/Compliance Officers and Clinicians.")
+                raise PermissionDenied("Agency admins and QA/Compliance Officers can only manage QA/Compliance Officers and Clinicians.")
             serializer.save(agency=user.agency)
         else:
             serializer.save()
@@ -176,7 +176,7 @@ class UserToggleStatusView(APIView):
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
             
         request_user = request.user
-        if getattr(request_user, 'role', None) == 'agency_admin':
+        if getattr(request_user, 'role', None) in ['agency_admin', 'qa_compliance']:
             if user.agency != request_user.agency:
                 return Response({'detail': 'Not authorized to modify this user.'}, status=status.HTTP_403_FORBIDDEN)
             if user.role not in ['qa_compliance', 'clinician']:

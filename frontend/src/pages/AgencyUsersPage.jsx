@@ -266,7 +266,7 @@ const AgencyUsersPage = () => {
 
     const totalPages = Math.ceil(totalCount / pageSize);
 
-    if (!user || user.role !== 'agency_admin') {
+    if (!user || !['agency_admin', 'qa_compliance'].includes(user.role)) {
         return null;
     }
 

@@ -78,7 +78,7 @@ function AppRoutes() {
       <Route
         path="/agency-users"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <AgencyUsersPage />
           </RoleBasedRoute>
         }
@@ -86,7 +86,7 @@ function AppRoutes() {
       <Route
         path="/patients"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <PatientsPage />
           </RoleBasedRoute>
         }
@@ -94,7 +94,7 @@ function AppRoutes() {
       <Route
         path="/patients/new"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <NewPatientForm />
           </RoleBasedRoute>
         }
@@ -102,7 +102,7 @@ function AppRoutes() {
       <Route
         path="/patients/:id"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <PatientDetailsPage />
           </RoleBasedRoute>
         }
@@ -110,7 +110,7 @@ function AppRoutes() {
       <Route
         path="/documents"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <DocumentsPage />
           </RoleBasedRoute>
         }
@@ -118,7 +118,7 @@ function AppRoutes() {
       <Route
         path="/documents/upload"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <DocumentUploadPage />
           </RoleBasedRoute>
         }
@@ -126,7 +126,7 @@ function AppRoutes() {
       <Route
         path="/ai-analyzer"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <AiAnalyzerPage />
           </RoleBasedRoute>
         }
@@ -134,7 +134,7 @@ function AppRoutes() {
       <Route
         path="/ai-analyzer/report/:id"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance']} redirectTo="/dashboard">
             <AiReportDetailPage />
           </RoleBasedRoute>
         }
@@ -142,7 +142,7 @@ function AppRoutes() {
       <Route
         path="/assigned-audit-reports"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'clinician']} redirectTo="/dashboard">
             <AssignedAuditReportsPage />
           </RoleBasedRoute>
         }

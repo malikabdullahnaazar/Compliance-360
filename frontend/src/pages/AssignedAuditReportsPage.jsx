@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { useDispatch } from 'react-redux';
 import {
     ClipboardList, CheckCircle, Clock, User, Calendar, ChevronDown,
@@ -15,6 +15,7 @@ import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { addToast } from '../store/slices/uiSlice';
 import api from '../services/api';
+import AuthContext from '../context/AuthContext';
 
 /* ─── API helpers ─────────────────────────────────────────────────────────── */
 const fetchAssigned = () => api.get('/ai/mistral/assigned/');
@@ -110,6 +111,8 @@ const DOC_TYPE_LABELS = {
 /* ─── Main Page ───────────────────────────────────────────────────────────── */
 const AssignedAuditReportsPage = () => {
     const dispatch = useDispatch();
+    const { user } = useContext(AuthContext);
+    const isClinician = user?.role === 'clinician';
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -752,7 +755,9 @@ const AssignedAuditReportsPage = () => {
                                     Assigned Audit Reports
                                 </h1>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    All audit reports assigned to clinicians in your agency.
+                                    {isClinician
+                                        ? 'Audit reports assigned to you. Review the AI analysis and submit your compliance document to complete each report.'
+                                        : 'All audit reports assigned to clinicians in your agency.'}
                                 </p>
                             </div>
 
@@ -774,7 +779,9 @@ const AssignedAuditReportsPage = () => {
                                         No assigned reports yet
                                     </h3>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
-                                        Go to the AI Analyzer, open a saved result, and click "Assign" to assign it to a clinician.
+                                        {isClinician
+                                            ? 'You have no audit reports assigned to you at this time. Please check back later or contact your agency admin.'
+                                            : 'Go to the AI Analyzer, open a saved result, and click "Assign" to assign it to a clinician.'}
                                     </p>
                                 </div>
                             )}

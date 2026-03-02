@@ -14,7 +14,10 @@ import {
   UserCheck,
   Stethoscope,
   UserPlus,
-  FileUp
+  FileUp,
+  ClipboardList,
+  CheckCircle,
+  Clock
 } from 'lucide-react';
 import { agencyService } from '../services/agency.service';
 import { patientService } from '../services/patient.service';
@@ -37,6 +40,8 @@ const Dashboard = () => {
   const [recentPatients, setRecentPatients] = useState([]);
   const [recentDocuments, setRecentDocuments] = useState([]);
   const [timeRange, setTimeRange] = useState('30d');
+  const [clinicianAssignments, setClinicianAssignments] = useState([]);
+  const [clinicianStats, setClinicianStats] = useState({ total: 0, incomplete: 0, complete: 0 });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,7 +58,7 @@ const Dashboard = () => {
             activeUsers: data.active_users
           });
         }
-        else if (user?.role === 'agency_admin') {
+        else if (user?.role === 'agency_admin' || user?.role === 'qa_compliance') {
           const [analyticsRes, patientsRes, documentsRes] = await Promise.allSettled([
             agencyService.getAnalytics(),
             patientService.getPatients(),
@@ -78,6 +83,22 @@ const Dashboard = () => {
             setRecentDocuments(documentsList.slice(0, 5));
           }
         }
+        else if (user?.role === 'clinician') {
+          // Fetch only the assignments assigned to this clinician
+          try {
+            const { default: api } = await import('../services/api');
+            const res = await api.get('/ai/mistral/assigned/');
+            const assignments = res.data || [];
+            setClinicianAssignments(assignments.slice(0, 5));
+            setClinicianStats({
+              total: assignments.length,
+              incomplete: assignments.filter(a => a.status !== 'complete').length,
+              complete: assignments.filter(a => a.status === 'complete').length,
+            });
+          } catch (err) {
+            console.error('Failed to fetch clinician assignments', err);
+          }
+        }
       } catch (err) {
         console.error('Failed to fetch dashboard data', err);
         dispatch(addToast({ type: 'error', message: 'Failed to load some dashboard data' }));
@@ -92,6 +113,134 @@ const Dashboard = () => {
   const handleAction = (msg) => {
     dispatch(addToast({ type: 'success', message: msg }));
   };
+
+  const renderClinicianDashboard = () => (
+    <div className="space-y-8">
+      {/* Stats Cards */}
+      <section className="grid gap-4 sm:grid-cols-3">
+        <Card className="p-5">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+              <ClipboardList className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Assigned</p>
+              <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{clinicianStats.total}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+              <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending</p>
+              <p className="mt-1 text-3xl font-bold text-amber-600 dark:text-amber-400">{clinicianStats.incomplete}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed</p>
+              <p className="mt-1 text-3xl font-bold text-green-600 dark:text-green-400">{clinicianStats.complete}</p>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      {/* Quick Action */}
+      <section>
+        <Link to="/assigned-audit-reports" className="block group">
+          <Card className="transition-all duration-200 hover:shadow-lg hover:border-teal-200 dark:hover:border-teal-800">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                  <ClipboardList className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white">Assigned Audit Reports</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Review AI-generated compliance reports and submit your documentation
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-teal-500 transform group-hover:translate-x-1 transition-all" />
+            </CardContent>
+          </Card>
+        </Link>
+      </section>
+
+      {/* Recent Assignments Table */}
+      <Card>
+        <CardHeader className="py-4 border-b dark:border-gray-800">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-teal-500" />
+            My Recent Assigned Reports
+          </h3>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 uppercase text-xs">
+                <tr>
+                  <th className="px-6 py-3">Patient</th>
+                  <th className="px-6 py-3 text-center">AI Result</th>
+                  <th className="px-6 py-3 text-center">Status</th>
+                  <th className="px-6 py-3 text-center">Assigned On</th>
+                  <th className="px-6 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y dark:divide-gray-800">
+                {clinicianAssignments.length > 0 ? clinicianAssignments.map(a => (
+                  <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{a.patient_name}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${a.ai_status === 'Pass'
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>
+                        {a.ai_status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${a.status === 'complete'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}>
+                        {a.status === 'complete' ? 'Complete' : 'Incomplete'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center text-gray-500">
+                      {new Date(a.assigned_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Link
+                        to="/assigned-audit-reports"
+                        className="text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 font-medium hover:underline text-xs"
+                      >
+                        View All
+                      </Link>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                      No reports assigned yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   const renderSuperAdminDashboard = () => (
     <div className="space-y-8">
@@ -383,16 +532,20 @@ const Dashboard = () => {
           <header className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-                {user?.role === 'superadmin' ? 'System Overview' : 'Agency Overview'}
+                {user?.role === 'superadmin' ? 'System Overview' : user?.role === 'qa_compliance' ? 'QA/Compliance Overview' : user?.role === 'clinician' ? 'Clinician Overview' : 'Agency Overview'}
               </h1>
               <p className="mt-2 text-lg text-gray-600 dark:text-gray-300">
                 {user?.role === 'superadmin'
                   ? 'Monitor system performance, manage agencies, and oversee compliance across all organizations.'
-                  : `Monitor your agency's health, patients, and compliance status.`}
+                  : user?.role === 'qa_compliance'
+                    ? 'Monitor patients, documents, and compliance status for quality assurance.'
+                    : user?.role === 'clinician'
+                      ? 'View and complete your assigned audit reports with full access to AI compliance analysis.'
+                      : `Monitor your agency's health, patients, and compliance status.`}
               </p>
             </div>
             <div className="flex gap-3">
-              {user?.role === 'agency_admin' ? (
+              {user?.role === 'agency_admin' || user?.role === 'qa_compliance' ? (
                 <>
                   <Link to="/patients/new">
                     <Button type="button" variant="primary" size="sm" className="cursor-pointer">
@@ -407,6 +560,13 @@ const Dashboard = () => {
                     </Button>
                   </Link>
                 </>
+              ) : user?.role === 'clinician' ? (
+                <Link to="/assigned-audit-reports">
+                  <Button type="button" variant="primary" size="sm" className="cursor-pointer">
+                    <ClipboardList className="h-4 w-4 mr-2" />
+                    My Audit Reports
+                  </Button>
+                </Link>
               ) : (
                 <Button
                   type="button"
@@ -427,8 +587,10 @@ const Dashboard = () => {
             </div>
           ) : user?.role === 'superadmin' ? (
             renderSuperAdminDashboard()
-          ) : user?.role === 'agency_admin' ? (
+          ) : (user?.role === 'agency_admin' || user?.role === 'qa_compliance') ? (
             renderAgencyAdminDashboard()
+          ) : user?.role === 'clinician' ? (
+            renderClinicianDashboard()
           ) : (
             <div className="p-8 text-center bg-gray-50 dark:bg-gray-800 rounded-xl">
               <p className="text-gray-500">Access Restricted</p>

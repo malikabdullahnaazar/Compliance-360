@@ -432,8 +432,8 @@ class DocumentManagementViewSet(viewsets.ModelViewSet):
         # Superadmins can see all documents
         if hasattr(user, 'is_superadmin') and user.is_superadmin:
             return AuditDocument.objects.all()
-        # Agency admins can see all documents in their agency
-        elif hasattr(user, 'is_agency_admin') and user.is_agency_admin and user.agency:
+        # Agency admins and QA/Compliance can see all documents in their agency
+        elif getattr(user, 'role', None) in ['agency_admin', 'qa_compliance'] and user.agency:
             return AuditDocument.objects.filter(agency=user.agency)
         # Regular users can see documents they created through audit sessions or linked to their patients
         else:
@@ -558,7 +558,7 @@ class DocumentManagementViewSet(viewsets.ModelViewSet):
             
             # Check if user has permission to access this patient's documents
             user = request.user
-            if (hasattr(user, 'role') and user.role not in ['superadmin', 'agency_admin']) and \
+            if (hasattr(user, 'role') and user.role not in ['superadmin', 'agency_admin', 'qa_compliance']) and \
                patient.created_by != user:
                 return Response(
                     {'error': 'Permission denied'},
@@ -1286,7 +1286,7 @@ class AssignedAuditReportView(viewsets.ViewSet):
 
         # Check agency scope
         user = request.user
-        if getattr(user, 'role', None) == 'agency_admin':
+        if getattr(user, 'role', None) in ['agency_admin', 'qa_compliance']:
             if clinician.agency != user.agency:
                 return Response({'error': 'Clinician does not belong to your agency'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -1306,7 +1306,8 @@ class AssignedAuditReportView(viewsets.ViewSet):
     def list_assigned(self, request):
         """
         GET /api/ai/mistral/assigned/
-        Returns all assignment records scoped to the requesting agency admin.
+        - Clinicians: only see assignments assigned to them.
+        - Agency admins / superadmins: see all assignments in their scope.
         """
         user = request.user
         qs = AssignedAuditReport.objects.select_related(
@@ -1316,6 +1317,9 @@ class AssignedAuditReportView(viewsets.ViewSet):
 
         if getattr(user, 'is_superadmin', False):
             pass  # see all
+        elif getattr(user, 'role', None) == 'clinician':
+            # Clinician can only see reports assigned specifically to them
+            qs = qs.filter(assigned_to=user)
         elif getattr(user, 'agency', None):
             qs = qs.filter(analysis_result__patient__agency=user.agency)
         else:
@@ -1349,6 +1353,7 @@ class AssignedAuditReportView(viewsets.ViewSet):
     @action(detail=True, methods=['get'], url_path='detail')
     def get_detail(self, request, pk=None):
         """GET /api/ai/mistral/assigned/<id>/detail/"""
+        user = request.user
         try:
             a = AssignedAuditReport.objects.select_related(
                 'analysis_result', 'analysis_result__patient',
@@ -1356,6 +1361,10 @@ class AssignedAuditReportView(viewsets.ViewSet):
             ).get(pk=pk)
         except AssignedAuditReport.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Clinicians can only access their own assigned reports
+        if getattr(user, 'role', None) == 'clinician' and a.assigned_to != user:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
         r = a.analysis_result
 
@@ -1404,10 +1413,15 @@ class AssignedAuditReportView(viewsets.ViewSet):
         Uploads a document, marks the assignment as complete.
         """
         from django.utils import timezone
+        user = request.user
         try:
             assignment = AssignedAuditReport.objects.get(pk=pk)
         except AssignedAuditReport.DoesNotExist:
             return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Clinicians can only upload to their own assigned reports
+        if getattr(user, 'role', None) == 'clinician' and assignment.assigned_to != user:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
         if assignment.status == 'complete':
             return Response({'error': 'This report is already completed. Cannot re-upload.'}, status=status.HTTP_400_BAD_REQUEST)

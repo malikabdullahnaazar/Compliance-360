@@ -27,7 +27,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         # Agency admins can see all patients in their agency, superadmins see all
         if hasattr(user, 'role') and user.role == 'superadmin':
             return Patient.objects.all()
-        elif hasattr(user, 'role') and user.role == 'agency_admin':
+        elif hasattr(user, 'role') and user.role in ['agency_admin', 'qa_compliance']:
             return Patient.objects.filter(agency=user.agency)
         return Patient.objects.filter(created_by=user)
 

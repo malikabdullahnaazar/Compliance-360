@@ -127,25 +127,25 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       icon: Stethoscope,
       label: 'Patients',
       path: '/patients',
-      roles: ['agency_admin'],
+      roles: ['agency_admin', 'qa_compliance'],
     },
     {
       icon: FileText,
       label: 'Documents',
       path: '/documents',
-      roles: ['agency_admin'],
+      roles: ['agency_admin', 'qa_compliance'],
     },
     {
       icon: Brain,
       label: 'AI Analyzer',
       path: '/ai-analyzer',
-      roles: ['agency_admin'],
+      roles: ['agency_admin', 'qa_compliance'],
     },
     {
       icon: ClipboardList,
       label: 'Assigned Audit Reports',
       path: '/assigned-audit-reports',
-      roles: ['agency_admin'],
+      roles: ['agency_admin', 'clinician'],
     },
   ];
 
@@ -159,13 +159,17 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       }
       return true;
     }
-    // Agency admin can see Overview, Patients, and Documents
+    // Agency admin can see Overview, Patients, Documents, AI Analyzer, Assigned Audit Reports
     if (user?.role === 'agency_admin') {
       // Exclude admin routes, agency-dashboard and analytics
       if (['admin/agencies', 'admin/users', 'analytics', 'agency-dashboard'].includes(item.path.replace(/^\//, ''))) {
         return false;
       }
       return ['/dashboard', '/agency-users', '/patients', '/documents', '/ai-analyzer', '/assigned-audit-reports'].includes(item.path);
+    }
+    // Clinician can only see Overview and Assigned Audit Reports
+    if (user?.role === 'clinician') {
+      return ['/dashboard', '/assigned-audit-reports'].includes(item.path);
     }
     return user && item.roles.includes(user.role);
   });

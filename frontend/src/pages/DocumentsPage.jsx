@@ -182,10 +182,10 @@ const DocumentsPage = () => {
                       Upload
                     </Button>
                   </Link>
-                  <Button type="button" variant="outline" className="hidden sm:flex items-center shadow-sm">
+                  {/* <Button type="button" variant="outline" className="hidden sm:flex items-center shadow-sm">
                     <Download className="h-4 w-4 mr-2" />
                     Export
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
 

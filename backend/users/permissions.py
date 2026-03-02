@@ -12,11 +12,11 @@ class IsSuperAdmin(permissions.BasePermission):
         )
 
 class IsSuperAdminOrAgencyAdmin(permissions.BasePermission):
-    """Only allow users with role 'superadmin' or 'agency_admin'."""
+    """Only allow users with role 'superadmin', 'agency_admin' or 'qa_compliance'."""
 
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and getattr(request.user, 'role', None) in ['superadmin', 'agency_admin']
+            and getattr(request.user, 'role', None) in ['superadmin', 'agency_admin', 'qa_compliance']
         )
