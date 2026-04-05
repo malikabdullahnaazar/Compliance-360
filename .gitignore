@@ -26,6 +26,7 @@ dist-ssr
 
 # Python
 __pycache__/
+backend/**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -62,6 +63,4 @@ media/
 *.bak
 *.swp
 *~
-backend/.env
-
 backend/.env

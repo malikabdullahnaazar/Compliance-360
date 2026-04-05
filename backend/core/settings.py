@@ -13,9 +13,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env so all os.getenv() calls below work correctly
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -140,6 +144,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ── Large file upload support ────────────────────────────────────────────────
+# Allow files up to 100 MB in memory so hospice chart PDFs (often 20 MB+)
+# can be received by Django without a request-body size error.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600   # 100 MB in bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600   # 100 MB in bytes
+
 # Custom User Model
 AUTH_USER_MODEL = 'users.CustomUser'
 
@@ -169,13 +179,25 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
-# AI Configuration
+# ── AI / Model Configuration ─────────────────────────────────────────────────
+# APP_ENV=Dev  → use Mistral AI (free / low cost, for development)
+# APP_ENV=Prod → use OpenAI GPT-4o / GPT-4o-mini (production)
+APP_ENV = os.getenv('APP_ENV', 'Dev')   # default to Dev if not set
+
 AI_SETTINGS = {
+    'APP_ENV': APP_ENV,
+    # OpenAI (Prod)
     'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY', ''),
-    'OPENAI_MODEL': os.getenv('OPENAI_MODEL', 'gpt-4o'),
-    'OPENAI_MAX_TOKENS': int(os.getenv('OPENAI_MAX_TOKENS', '4000')),
+    'OPENAI_MODEL': os.getenv('OPENAI_MODEL', 'gpt-4o'),           # full analysis
+    'OPENAI_MINI_MODEL': os.getenv('OPENAI_MINI_MODEL', 'gpt-4o-mini'),  # lightweight tasks
+    'OPENAI_MAX_TOKENS': int(os.getenv('OPENAI_MAX_TOKENS', '16000')),
     'OPENAI_TEMPERATURE': float(os.getenv('OPENAI_TEMPERATURE', '0.1')),
-    'MAX_DOCUMENT_SIZE_MB': int(os.getenv('AI_MAX_DOCUMENT_SIZE_MB', '50')),
+    'OPENAI_FILE_SIZE_LIMIT_MB': float(os.getenv('OPENAI_FILE_SIZE_LIMIT_MB', '20')),
+    # Mistral (Dev)
+    'MISTRAL_AI_KEY': os.getenv('MISTRAL_AI_KEY', ''),
+    'MISTRAL_MODEL': os.getenv('MISTRAL_MODEL', 'open-mistral-nemo'),
+    # Shared
+    'MAX_DOCUMENT_SIZE_MB': int(os.getenv('AI_MAX_DOCUMENT_SIZE_MB', '0')),  # 0 = no limit
     'OCR_ENABLED': os.getenv('AI_OCR_ENABLED', 'true').lower() == 'true',
     'DEFAULT_FRAMEWORKS': os.getenv('DEFAULT_FRAMEWORKS', 'CMS,CHAP').split(','),
     'ENABLE_TEXAS_HHSC': os.getenv('ENABLE_TEXAS_HHSC', 'true').lower() == 'true',

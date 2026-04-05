@@ -43,8 +43,13 @@ from .serializers import (
 )
 from .services.ai_service import get_ai_service
 from .services.document_processor import get_document_processor
+from .services.unified_ai_service import get_unified_ai_service, OPENAI_FILE_SIZE_LIMIT_MB
 
 logger = logging.getLogger(__name__)
+
+# Read APP_ENV once at module level
+_APP_ENV = os.getenv('APP_ENV', 'Dev').strip().lower()
+_IS_PROD = _APP_ENV == 'prod'
 
 
 class AuditSessionViewSet(viewsets.ModelViewSet):
@@ -95,6 +100,20 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
                 )
 
             document_type = serializer.validated_data['document_type']
+
+            # Enforce OpenAI file-size limit in Prod mode
+            file_size_mb = uploaded_file.size / (1024 * 1024)
+            if _IS_PROD and file_size_mb > OPENAI_FILE_SIZE_LIMIT_MB:
+                return Response(
+                    {
+                        'error': (
+                            f"File '{uploaded_file.name}' is {file_size_mb:.1f} MB which exceeds "
+                            f"the {OPENAI_FILE_SIZE_LIMIT_MB:.0f} MB limit for AI analysis. "
+                            f"Please split or compress the document and re-upload."
+                        )
+                    },
+                    status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+                )
 
             # Process the document
             processor = get_document_processor()
@@ -166,6 +185,20 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
                 )
 
             document_type = serializer.validated_data['document_type']
+
+            # Enforce OpenAI file-size limit in Prod mode
+            file_size_mb = uploaded_file.size / (1024 * 1024)
+            if _IS_PROD and file_size_mb > OPENAI_FILE_SIZE_LIMIT_MB:
+                return Response(
+                    {
+                        'error': (
+                            f"File '{uploaded_file.name}' is {file_size_mb:.1f} MB which exceeds "
+                            f"the {OPENAI_FILE_SIZE_LIMIT_MB:.0f} MB limit for AI analysis. "
+                            f"Please split or compress the document and re-upload."
+                        )
+                    },
+                    status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+                )
 
             # Process the document
             processor = get_document_processor()
@@ -835,16 +868,18 @@ class MistralAnalyzeView(viewsets.ViewSet):
                 'document_type': doc.document_type,
                 'document_type_display': doc.get_document_type_display(),
                 'extracted_text': doc.extracted_text or '[No text extracted]',
+                'file_size_mb': float(doc.file_size_mb or 0),
             }
             for doc in documents_qs
         ]
 
         try:
-            service = get_mistral_service()
+            service = get_unified_ai_service()
             report_markdown = service.analyze_documents(
                 documents=documents_data,
                 patient_info=patient_info,
             )
+            ai_model_name = service.model_name
             import re
             from datetime import datetime
             current_date_str = datetime.now().strftime("%B %d, %Y")
@@ -864,14 +899,14 @@ class MistralAnalyzeView(viewsets.ViewSet):
             )
             report_markdown = iso_pattern.sub(datetime.now().isoformat(), report_markdown)
 
+            # Replace [Model Name] placeholder with actual model name
+            model_pattern = re.compile(r'\[Model\s+Name\]', re.IGNORECASE)
+            report_markdown = model_pattern.sub(ai_model_name, report_markdown)
+
             # Post-process: make document names clickable links.
-            # Use re.sub with a negative lookbehind on '](' to avoid re-replacing
-            # filenames that are already inside a markdown link text.
             for doc in documents_qs:
                 escaped = re.escape(doc.filename)
                 link = f"[{doc.filename}](doc:{str(doc.id)})"
-                # Only replace occurrences NOT already preceded by '](' (already a link)
-                # Pattern: filename not immediately inside a [] already
                 report_markdown = re.sub(
                     rf'(?<!\[){escaped}(?!\])',
                     link,
@@ -880,13 +915,14 @@ class MistralAnalyzeView(viewsets.ViewSet):
 
 
         except Exception as exc:
-            logger.error(f'Mistral analysis failed: {exc}')
+            logger.error(f'AI analysis failed: {exc}')
             return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({
             'report_markdown': report_markdown,
             'patient_info': patient_info,
             'document_names': [d['filename'] for d in documents_data],
+            'ai_model_used': ai_model_name,
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='analyze_assignment')
@@ -983,7 +1019,9 @@ class MistralAnalyzeView(viewsets.ViewSet):
         patient_id = request.data.get('patient_id')
         report_markdown = request.data.get('report_markdown', '').strip()
         document_names = request.data.get('document_names', [])
-        ai_model = request.data.get('ai_model_used', 'open-mistral-nemo')
+        # Use the actual model name from unified service if not provided by frontend
+        _default_model = get_unified_ai_service().model_name
+        ai_model = request.data.get('ai_model_used') or _default_model
         status_val = request.data.get('status', 'Fail')
 
         if not patient_id or not report_markdown:

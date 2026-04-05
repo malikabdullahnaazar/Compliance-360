@@ -68,18 +68,22 @@ const DocumentUploadPage = () => {
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
 
-    // Validate files
     const validFiles = [];
     const newErrors = {};
 
+    // OpenAI production limit – files larger than this trigger an AI-analysis warning.
+    const OPENAI_LIMIT_MB = 20;
+    // Django server hard limit – reject outright
+    const SERVER_LIMIT_MB = 100;
+
     files.forEach(file => {
-      // Check file size (max 50MB)
-      if (file.size > 50 * 1024 * 1024) {
-        newErrors[file.name] = 'File size exceeds 50MB limit';
+      const fileSizeMB = file.size / (1024 * 1024);
+
+      if (fileSizeMB > SERVER_LIMIT_MB) {
+        newErrors[file.name] = `File (${fileSizeMB.toFixed(1)} MB) exceeds the ${SERVER_LIMIT_MB} MB server limit. Please split the document.`;
         return;
       }
 
-      // Check file type
       const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
       if (!allowedTypes.includes(file.type)) {
         newErrors[file.name] = 'Only PDF and Word documents are allowed';
@@ -90,8 +94,10 @@ const DocumentUploadPage = () => {
         file,
         name: file.name,
         size: file.size,
+        sizeMB: fileSizeMB,
         type: file.type,
-        preview: URL.createObjectURL(file)
+        preview: URL.createObjectURL(file),
+        exceedsAILimit: fileSizeMB > OPENAI_LIMIT_MB,
       });
     });
 
@@ -322,7 +328,10 @@ const DocumentUploadPage = () => {
                         </label>
                         <p className="pl-1">or drag and drop</p>
                       </div>
-                      <p className="text-xs text-gray-500">PDF, DOC, DOCX up to 50MB</p>
+                      <p className="text-xs text-gray-500">
+                        PDF, DOC, DOCX – up to 100 MB per file.
+                        <span className="text-yellow-600 font-medium"> Files larger than 20 MB may require Dev mode for AI analysis.</span>
+                      </p>
                     </div>
                   </div>
                   {errors.files && (
@@ -333,10 +342,16 @@ const DocumentUploadPage = () => {
                 {selectedFiles.length > 0 && (
                   <ul className="border border-gray-200 rounded-md divide-y divide-gray-200 dark:border-gray-800 dark:divide-gray-800">
                     {selectedFiles.map((fileInfo, index) => (
-                      <li key={index} className="flex items-center justify-between p-3">
-                        <div className="flex items-center">
-                          <Paperclip className="h-5 w-5 text-gray-400 mr-2" />
+                      <li key={index} className={`flex items-center justify-between p-3 ${fileInfo.exceedsAILimit ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}`}>
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="h-5 w-5 text-gray-400" />
                           <span className="text-sm font-medium truncate max-w-xs">{fileInfo.name}</span>
+                          <span className="text-xs text-gray-400">({fileInfo.sizeMB ? fileInfo.sizeMB.toFixed(1) : (fileInfo.size / 1024 / 1024).toFixed(1)} MB)</span>
+                          {fileInfo.exceedsAILimit && (
+                            <span className="text-xs text-yellow-600 font-semibold px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 rounded">
+                              ⚠ &gt;20 MB – AI limit in Prod
+                            </span>
+                          )}
                         </div>
                         <button
                           type="button"
