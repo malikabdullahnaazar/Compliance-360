@@ -167,26 +167,85 @@ class ReportAnalyzeView(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='results')
     def list_results(self, request):
-        """List all saved AI analysis results."""
-        from django.db.models import Exists, OuterRef
+        """
+        GET /api/ai/mistral/results/?patient_id=<uuid>&page=<int>&page_size=<int>&search=<str>&status=<str>
+        Returns all saved AI analysis results with pagination and optional filtering/search.
+        """
+        from rest_framework.pagination import PageNumberPagination
+        from django.db.models import Exists, OuterRef, Q
+
         patient_id = request.query_params.get('patient_id')
+        search_query = request.query_params.get('search', '').strip()
+        page_size_param = request.query_params.get('page_size')
+        status_filter = request.query_params.get('status', '').strip()  # 'Pass' or 'Fail'
+
         qs = AIAnalysisResult.objects.select_related('patient', 'created_by').annotate(
             is_assigned=Exists(AssignedAuditReport.objects.filter(analysis_result=OuterRef('pk')))
         )
         
         if patient_id:
             qs = qs.filter(patient_id=patient_id)
-            
+
+        # Filter by status (Pass or Fail)
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        # Server-side search by patient name
+        if search_query:
+            qs = qs.filter(
+                Q(patient__first_name__icontains=search_query) |
+                Q(patient__last_name__icontains=search_query)
+            )
+
+        qs = qs.order_by('-created_at')
+
+        # Apply pagination
+        paginator = PageNumberPagination()
+        if page_size_param:
+            try:
+                paginator.page_size = int(page_size_param)
+            except (ValueError, TypeError):
+                pass
+        else:
+            paginator.page_size = 10
+
+        page = paginator.paginate_queryset(qs, request)
+        if page is None:
+            return Response({'error': 'Invalid page number'}, status=status.HTTP_404_NOT_FOUND)
+
         data = []
-        for r in qs:
+        for r in page:
+            # Fetch analyzed document records for frontend compatibility
+            analyzed_docs = AuditDocument.objects.filter(
+                patient=r.patient,
+                filename__in=r.analyzed_document_names
+            ).values('id', 'filename', 'document_type')
+            
+            # Check for clinician submitted document in related assignments
+            clinician_assignment = AssignedAuditReport.objects.filter(analysis_result=r).first()
+            clinician_doc_status = 'pending'
+            clinician_assignment_id = None
+            if clinician_assignment:
+                clinician_assignment_id = str(clinician_assignment.id)
+                if clinician_assignment.uploaded_document:
+                    clinician_doc_status = 'submitted'
+
             data.append({
                 'id': str(r.id),
+                'patient_id': str(r.patient.id),
                 'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
                 'status': r.status,
+                'ai_model_used': r.ai_model_used,
+                'report_markdown': r.report_markdown[:200] + '...', # snippet for list
                 'created_at': r.created_at.isoformat(),
-                'is_assigned': r.is_assigned
+                'is_assigned': r.is_assigned,
+                'analyzed_document_names': r.analyzed_document_names,
+                'analyzed_documents': list(analyzed_docs),
+                'clinician_document_status': clinician_doc_status,
+                'clinician_assignment_id': clinician_assignment_id,
             })
-        return Response(data)
+            
+        return paginator.get_paginated_response(data)
 
     @action(detail=False, methods=['get'], url_path='results/(?P<result_id>[^/.]+)/detail')
     def get_result_detail(self, request, result_id=None):
@@ -267,3 +326,37 @@ class ReportAnalyzeView(viewsets.ViewSet):
             return FileResponse(open(a.uploaded_document.path, 'rb'))
         except Exception:
             return Response({'error': 'Error'}, status=status.HTTP_404_NOT_FOUND)
+    @action(detail=False, methods=['post'], url_path='results/(?P<result_id>[^/.]+)/mark_as_pass')
+    def mark_as_pass(self, request, result_id=None):
+        """
+        POST /api/ai/mistral/results/<id>/mark_as_pass/
+        Manually mark a 'Fail' report as 'Pass'.
+        Only allows superadmins, agency admins, or QA/Compliance roles.
+        """
+        from users.models import User
+        try:
+            # Check permissions
+            is_admin = request.user.role == User.Role.SUPERADMIN or request.user.role == User.Role.AGENCY_ADMIN
+            is_qa = request.user.role == User.Role.QA_COMPLIANCE
+            
+            if not (is_admin or is_qa):
+                return Response(
+                    {'error': 'You do NOT have permission to manually pass reports.'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            result = AIAnalysisResult.objects.get(pk=result_id)
+            if result.status == 'Pass':
+                return Response({'message': 'Report is already marked as Passed.'}, status=status.HTTP_200_OK)
+
+            result.status = 'Pass'
+            result.save()
+
+            logger.info(f"Report {result_id} manually marked as PASS by user {request.user.email}")
+            return Response({'message': 'Report marked as Passed successfully.'}, status=status.HTTP_200_OK)
+            
+        except AIAnalysisResult.DoesNotExist:
+            return Response({'error': 'Report not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error marking report as Pass: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
