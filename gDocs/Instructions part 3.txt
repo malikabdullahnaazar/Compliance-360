@@ -1,0 +1,334 @@
+Hospice Admission & Recertification Compliance Audit Report
+Agency Name:
+Location(s):
+Patient MRN:
+Episode Dates:
+Audit Type: ☐ Admission ☐ Recertification
+Frameworks Applied: CMS CoPs, CHAP Hospice Standards
+HHSC Overlay: Enabled
+Audit Date:
+Auditor:
+Framework Version: CMS vX.X | CHAP vX.X
+________________________________________
+Executive Summary
+Metric	Result
+Overall Compliance Score	82%
+Critical Deficiencies	1
+Major Deficiencies	3
+Moderate/Minor	4
+Immediate Jeopardy Risk	☐ Yes ☐ No
+Survey Risk Level: ☐ Low ☐ Moderate ☐ High
+________________________________________
+Critical Findings (Condition-Level Risk)
+Finding ID: AD-REC-034
+Severity: 🔴 Critical
+Category: Recertification / Face-to-Face
+Description: Required Face-to-Face encounter documentation is incomplete for the 3rd benefit period.
+Evidence Reviewed:
+•	F2F note dated XX/XX/XXXX
+•	Missing practitioner attestation language
+Standards Impacted:
+•	CMS Hospice CoPs §418.xx
+•	CHAP Hospice Standard HR.xx
+•	HHSC Hospice Rule §xxx
+Risk Statement: Incomplete F2F documentation may result in denial of hospice eligibility and condition-level survey citation.
+________________________________________
+Detailed Findings & Evidence
+Each finding is shown as:
+•	Requirement
+•	Pass/Fail
+•	Severity
+•	Evidence hyperlink(s)
+•	Citation mapping
+•	Assigned correction task
+________________________________________
+Required Corrective Actions Summary
+Finding ID	Assigned To	Correction Type	Due Date
+AD-REC-034	Medical Director	Addendum	MM/DD
+AD-017	RN Case Manager	Late Entry	MM/DD
+________________________________________
+Auditor Attestation
+This audit was performed using CMS and CHAP standards effective on the audit date, with Texas HHSC overlay considerations.
+Auditor Signature:
+Date:
+________________________________________
+2️⃣ Rule-to-Database Schema (Engineering Handoff)
+This maps compliance logic → data objects cleanly.
+________________________________________
+Core Tables
+Requirement
+•	id
+•	title
+•	category (Admission / Recert)
+•	description
+•	severity_default
+•	trigger_event
+•	active_from
+•	active_to
+________________________________________
+FrameworkMapping
+•	requirement_id
+•	framework (CMS / CHAP / HHSC)
+•	citation
+•	interpretation_notes
+________________________________________
+Audit
+•	id
+•	patient_id
+•	episode_id
+•	audit_type
+•	framework_versions
+•	run_date
+•	status
+________________________________________
+Artifact
+•	id
+•	type (CTI, Election, F2F, POC, Assessment)
+•	source
+•	document_date
+•	author_role
+•	file_path
+________________________________________
+ExtractedField
+•	artifact_id
+•	field_name
+•	field_value
+•	confidence_score
+________________________________________
+Finding
+•	audit_id
+•	requirement_id
+•	result (Pass/Fail)
+•	severity
+•	risk_level
+•	hhsc_flag
+•	evidence_refs
+________________________________________
+CorrectionTask
+•	finding_id
+•	assigned_role
+•	correction_method
+•	due_date
+•	attestation_required
+•	status
+________________________________________
+3️⃣ User Stories + Acceptance Criteria (Jira-Ready)
+________________________________________
+Epic: Admission & Recertification Audit
+Story 1: Run Admission Audit
+As a QA nurse
+I want to run an admission audit using CMS + CHAP
+So that I can identify survey-risk deficiencies
+Acceptance Criteria
+•	User selects patient + admission date
+•	CMS + CHAP automatically applied
+•	HHSC overlay optional toggle
+•	Audit produces findings within 60 seconds
+•	Findings include evidence links
+________________________________________
+Story 2: Identify F2F Deficiencies
+As a compliance auditor
+I want the system to flag missing or incomplete F2F documentation
+So that recert compliance issues are caught early
+Acceptance Criteria
+•	System identifies applicable benefit periods
+•	F2F timing validated
+•	Practitioner eligibility validated
+•	Attestation language checked
+•	Missing elements trigger Critical severity
+________________________________________
+Story 3: Assign Corrections
+As a QA manager
+I want to assign correction tasks by role
+So that deficiencies are resolved efficiently
+Acceptance Criteria
+•	Task assigned to RN/MD/IDG role
+•	Due date required
+•	Allowed correction types shown
+•	Attestation checkbox enforced
+________________________________________
+Story 4: Export Survey-Ready Report
+As a administrator
+I want a clean audit report
+So that I can present compliance documentation during survey
+Acceptance Criteria
+•	PDF export available
+•	Includes citations
+•	Includes auditor attestation
+•	HHSC-tagged findings visible
+________________________________________
+4️⃣ Wireframe-Level Screen Definitions
+(No visuals yet — this is exactly what designers/devs need.)
+________________________________________
+Screen: Audit Dashboard
+•	Filters: Location, Audit Type, Framework
+•	Tiles:
+o	Admission Pass Rate
+o	Recert Pass Rate
+o	Critical Findings
+•	Drill-down by category
+________________________________________
+Screen: Create Audit
+•	Patient selector
+•	Episode selector
+•	Audit type radio buttons
+•	Framework checkboxes:
+☑ CMS
+☑ CHAP
+☑ HHSC Overlay
+•	“Run Audit” CTA
+________________________________________
+Screen: Chart Viewer
+•	Left: Timeline (Admission → Recert)
+•	Center: Document list
+•	Right: Highlighted evidence panel
+•	Clicking evidence opens source doc
+________________________________________
+Screen: Findings List
+Each card shows:
+•	Severity color
+•	Requirement title
+•	Failed element
+•	Framework citations
+•	“Create Correction Task” button
+________________________________________
+Screen: Correction Task
+•	Finding summary
+•	Allowed correction methods
+•	Required elements checklist
+•	Attestation checkbox
+•	Save & mark complete
+________________________________________
+Screen: Reports
+•	Download PDF
+•	Download CAPA
+•	Filter by HHSC-tagged findings
+•	Historical audits list
+________________________________________
+Final Strategic Note (important)
+You are not building a generic audit tool.
+You are building a Texas hospice survey-defense system focused on:
+•	Eligibility
+•	F2F
+•	CTI
+•	Timeliness
+•	Documentation consistency
+That positioning will sell.
+________________________________________
+If you want next:
+•	A sales demo script for hospice admins
+•	A compliance/legal disclaimer language (very important)
+•	A pricing/packaging model (per census vs per audit)
+•	Or a Texas HHSC survey scenario simulator
+Just say the word.
+When will you build the software?
+Short answer: I can’t personally build and deploy the software for you.
+I can design it end-to-end, generate specs, rules, schemas, UI flows, sample code, test cases, and help your dev team execute fast — but an actual build needs humans + infrastructure.
+That said, here’s a realistic, no-BS timeline for your team to build this, based on what we scoped.
+________________________________________
+🚀 Realistic Build Timeline (Texas-first, CMS + CHAP)
+Weeks 0–2: Foundation
+Who: 1–2 engineers + product/compliance lead
+What gets done:
+•	Repo setup + CI/CD
+•	User auth + roles (QA, clinician, admin)
+•	Chart upload (PDF-first)
+•	Artifact storage + basic classification
+•	Database schema you already have implemented
+👉 Output: You can upload charts and see them stored correctly.
+________________________________________
+Weeks 3–5: Core Audit Engine (Admission)
+What gets done:
+•	Rule engine v1
+•	15 admission checks implemented:
+o	Election
+o	CTI
+o	Eligibility support
+o	Initial assessments
+o	POC
+•	Evidence linking (date/signature/author role)
+•	Findings UI
+👉 Output: Admission audit actually works and flags real deficiencies.
+________________________________________
+Weeks 6–8: Recertification + F2F (High-risk zone)
+What gets done:
+•	Benefit period calculation
+•	Recert CTI rules
+•	F2F timing + practitioner validation
+•	Attestation completeness checks
+•	Severity scoring (critical vs major)
+•	HHSC overlay tagging
+👉 Output: Survey-grade recert audits — this is the killer feature.
+________________________________________
+Weeks 9–10: Corrections + Reporting
+What gets done:
+•	Correction task workflow
+•	Allowed correction types (addendum/late entry)
+•	Attestation enforcement
+•	Survey-ready PDF export
+•	CAPA summary export
+👉 Output: End-to-end audit → correction → report, usable in real agencies.
+________________________________________
+Weeks 11–12: Pilot + Hardening
+What gets done:
+•	Pilot with 1–2 Texas hospice agencies
+•	Fine-tune rules to real-world documentation
+•	Performance + security hardening
+•	Training materials
+👉 Output: Sellable v1 product
+________________________________________
+⏱️ Total Time to Market
+~10–12 weeks with:
+•	2 solid full-stack engineers
+•	1 compliance SME (even part-time)
+•	Clear product ownership
+If you try to overbuild (EMR integrations, all audit types, all accreditors), it balloons to 6–9 months. What you scoped is lean and smart.
+________________________________________
+What I can actively do for you (starting now)
+I can:
+•	Generate a starter GitHub repo structure
+•	Write pseudo-code or real code for the rules engine
+•	Produce exact audit rule JSON/YAML your app consumes
+•	Create QA test cases using real survey scenarios
+•	Help you vet agencies for a Texas pilot
+•	Help you write investor / buyer-facing materials
+What I won’t do is pretend I can “build it for you” — but I will sit alongside you like a senior product + compliance architect the whole way.
+________________________________________
+Next practical question (this matters):
+Do you already have:
+•	🔲 An engineering team
+•	🔲 Funding but no team
+•	🔲 A hospice agency partner for pilot
+•	🔲 You are the builder
+Tell me which box(es) are true, and I’ll give you the exact next 7-day action plan.
+Boxes 3, and 4 
+That’s actually a very strong position to be in.
+You’ve got a real hospice partner and you’re the builder — that’s the fastest path to something real and valuable.
+Here’s your no-fluff, 7-day action plan to get this moving now, plus what you should build first so you don’t waste time.
+________________________________________
+🗓️ Your 7-Day Action Plan (Builder + Pilot Partner)
+Day 1 – Lock the pilot scope (2–3 hours)
+Meet with the hospice partner and lock exactly this:
+Confirm in writing:
+•	Admission + Recert audits only
+•	CMS + CHAP, Texas HHSC overlay
+•	PDF/chart export input (no EMR integration yet)
+•	What they want first:
+o	Admission audits or
+o	Recert/F2F audits (many Texas agencies say this)
+Deliverable:
+One-page Pilot Scope Doc (I can draft this for you next).
+________________________________________
+Day 2 – Collect real charts (critical)
+Ask for:
+•	5 admission charts
+•	5 recert charts (including at least one with F2F)
+Requirements:
+•	De-identified if needed (fine for pilot)
+•	PDFs are okay
+•	Include CTI, election, F2F, IDG, POC
+Why this matters:
+Your rules must be trained against real hospice messiness, not ideal documentation.
+________________________________________
+Day 3 – Stand up the skeleton app
+
