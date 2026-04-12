@@ -9,19 +9,29 @@ from ..serializers import ComplianceFindingSerializer, UpdateFindingSerializer
 
 class ComplianceFindingViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing compliance findings.
+    ViewSet for managing compliance findings with strict agency-level data isolation.
     """
     permission_classes = [IsAuthenticated]
     serializer_class = ComplianceFindingSerializer
-    
+
     def get_queryset(self):
-        """Filter findings by user permissions."""
+        """Filter findings by user permissions with strict agency isolation."""
         user = self.request.user
-        if hasattr(user, 'role') and user.role in ['superadmin', 'qa']:
+        
+        # Superadmins and QA can see all findings
+        if hasattr(user, 'role') and user.role in ['superadmin', 'qa_compliance']:
             return ComplianceFinding.objects.all()
+        
+        # Agency admins and leadership can see findings in their agency
+        if hasattr(user, 'role') and user.role in ['agency_admin', 'clinical_leadership']:
+            if not user.agency:
+                return ComplianceFinding.objects.none()
+            return ComplianceFinding.objects.filter(agency=user.agency)
+        
+        # Others can only see findings they created or are assigned to
         return ComplianceFinding.objects.filter(
             Q(audit_session__created_by=user) | Q(assigned_to=user)
-        )
+        ).distinct()
     
     def get_serializer_class(self):
         """Use update serializer for partial updates."""

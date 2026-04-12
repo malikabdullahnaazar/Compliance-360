@@ -5,7 +5,8 @@
       "WebSearch",
       "WebFetch(www.myhbconsulting.com)",
       "WebFetch(www.nursemagic.ai)",
-      "WebFetch(www.cms.gov)"
+      "WebFetch(www.cms.gov)",
+      "Bash(python *)"
     ]
   },
   "$version": 3

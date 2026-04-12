@@ -145,17 +145,18 @@ class ReportAnalyzeView(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'], url_path='save')
     def save_result(self, request):
-        """Saves an AIAnalysisResult record."""
+        """Saves an AIAnalysisResult record with agency."""
         from patients.models import Patient
         patient_id = request.data.get('patient_id')
         report_markdown = request.data.get('report_markdown', '').strip()
         document_names = request.data.get('document_names', [])
-        
+
         try:
             patient = Patient.objects.get(id=patient_id)
             result = AIAnalysisResult.objects.create(
                 patient=patient,
                 created_by=request.user,
+                agency=request.user.agency,  # Set agency from user
                 analyzed_document_names=document_names,
                 report_markdown=report_markdown,
                 ai_model_used=request.data.get('ai_model_used', 'unknown'),
@@ -170,6 +171,7 @@ class ReportAnalyzeView(viewsets.ViewSet):
         """
         GET /api/ai/mistral/results/?patient_id=<uuid>&page=<int>&page_size=<int>&search=<str>&status=<str>
         Returns all saved AI analysis results with pagination and optional filtering/search.
+        Agency-scoped filtering applied.
         """
         from rest_framework.pagination import PageNumberPagination
         from django.db.models import Exists, OuterRef, Q
@@ -178,11 +180,24 @@ class ReportAnalyzeView(viewsets.ViewSet):
         search_query = request.query_params.get('search', '').strip()
         page_size_param = request.query_params.get('page_size')
         status_filter = request.query_params.get('status', '').strip()  # 'Pass' or 'Fail'
-
+        
+        user = request.user
+        
         qs = AIAnalysisResult.objects.select_related('patient', 'created_by').annotate(
             is_assigned=Exists(AssignedAuditReport.objects.filter(analysis_result=OuterRef('pk')))
         )
         
+        # Apply agency-level filtering
+        if hasattr(user, 'role') and user.role == 'superadmin':
+            # Superadmins can see all results
+            pass
+        elif user.agency:
+            # All other users can only see results from their agency
+            qs = qs.filter(agency=user.agency)
+        else:
+            # Users without agency see nothing
+            qs = qs.none()
+
         if patient_id:
             qs = qs.filter(patient_id=patient_id)
 
@@ -333,19 +348,27 @@ class ReportAnalyzeView(viewsets.ViewSet):
         Manually mark a 'Fail' report as 'Pass'.
         Only allows superadmins, agency admins, or QA/Compliance roles.
         """
-        from users.models import User
         try:
             # Check permissions
-            is_admin = request.user.role == User.Role.SUPERADMIN or request.user.role == User.Role.AGENCY_ADMIN
-            is_qa = request.user.role == User.Role.QA_COMPLIANCE
-            
+            is_admin = request.user.role in ['superadmin', 'agency_admin']
+            is_qa = request.user.role == 'qa_compliance'
+
             if not (is_admin or is_qa):
                 return Response(
-                    {'error': 'You do NOT have permission to manually pass reports.'}, 
+                    {'error': 'You do NOT have permission to manually pass reports.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
             result = AIAnalysisResult.objects.get(pk=result_id)
+            
+            # Verify agency access
+            if request.user.role != 'superadmin':
+                if not result.agency or result.agency != request.user.agency:
+                    return Response(
+                        {'error': 'You do not have permission to access this report.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
             if result.status == 'Pass':
                 return Response({'message': 'Report is already marked as Passed.'}, status=status.HTTP_200_OK)
 
@@ -354,7 +377,7 @@ class ReportAnalyzeView(viewsets.ViewSet):
 
             logger.info(f"Report {result_id} manually marked as PASS by user {request.user.email}")
             return Response({'message': 'Report marked as Passed successfully.'}, status=status.HTTP_200_OK)
-            
+
         except AIAnalysisResult.DoesNotExist:
             return Response({'error': 'Report not found.'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:

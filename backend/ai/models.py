@@ -17,31 +17,41 @@ class AuditSession(models.Model):
         ('follow_up', 'Follow-up Audit'),
         ('complaint', 'Complaint-driven Audit'),
     ]
-    
+
     RISK_LEVELS = [
         ('LOW', 'Low Risk'),
         ('MEDIUM', 'Medium Risk'),
         ('HIGH', 'High Risk'),
         ('CRITICAL', 'Critical Risk'),
     ]
-    
+
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     # Relationships
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='audit_sessions'
     )
+    
+    # Associated agency for data isolation
+    agency = models.ForeignKey(
+        'agencies.Agency',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_sessions'
+    )
+    
     patient_id = models.CharField(max_length=100, help_text="Patient identifier")
     patient_name = models.CharField(max_length=255, blank=True)
     
@@ -67,10 +77,11 @@ class AuditSession(models.Model):
         indexes = [
             models.Index(fields=['patient_id']),
             models.Index(fields=['created_by']),
+            models.Index(fields=['agency']),
             models.Index(fields=['status']),
             models.Index(fields=['created_at']),
         ]
-    
+
     def __str__(self):
         return f"Audit {self.id} - {self.patient_id} ({self.audit_type})"
 
@@ -179,6 +190,15 @@ class ComplianceFinding(models.Model):
         related_name='findings'
     )
     
+    # Associated agency for data isolation
+    agency = models.ForeignKey(
+        'agencies.Agency',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='compliance_findings'
+    )
+
     # Finding Details
     check_number = models.IntegerField(help_text="Check number from 40 High-Risk Checks")
     category = models.CharField(max_length=1, choices=CHECK_CATEGORIES)
@@ -212,6 +232,7 @@ class ComplianceFinding(models.Model):
         ordering = ['-severity', 'check_number', 'created_at']
         indexes = [
             models.Index(fields=['audit_session']),
+            models.Index(fields=['agency']),
             models.Index(fields=['severity']),
             models.Index(fields=['status']),
             models.Index(fields=['assigned_to']),
@@ -346,6 +367,15 @@ class AIAnalysisResult(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
+    # Associated agency for data isolation
+    agency = models.ForeignKey(
+        'agencies.Agency',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ai_analysis_results'
+    )
+
     patient = models.ForeignKey(
         'patients.Patient',
         on_delete=models.CASCADE,
@@ -400,6 +430,11 @@ class AIAnalysisResult(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['agency']),
+            models.Index(fields=['patient']),
+            models.Index(fields=['created_by']),
+        ]
 
     def __str__(self):
         return f"AI Analysis – {self.patient} – {self.created_at.date()}"
@@ -416,6 +451,15 @@ class AssignedAuditReport(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Associated agency for data isolation
+    agency = models.ForeignKey(
+        'agencies.Agency',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_audit_reports'
+    )
 
     analysis_result = models.ForeignKey(
         AIAnalysisResult,
@@ -452,6 +496,11 @@ class AssignedAuditReport(models.Model):
 
     class Meta:
         ordering = ['-assigned_at']
+        indexes = [
+            models.Index(fields=['agency']),
+            models.Index(fields=['assigned_to']),
+            models.Index(fields=['assigned_by']),
+        ]
 
     def __str__(self):
         return f"Assignment – {self.analysis_result} → {self.assigned_to}"

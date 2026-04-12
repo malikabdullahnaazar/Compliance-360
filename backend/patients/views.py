@@ -12,7 +12,7 @@ from .serializers import PatientSerializer, PatientCreateSerializer, PatientUpda
 
 class PatientViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing patients.
+    ViewSet for managing patients with strict agency-level data isolation.
     """
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
@@ -22,14 +22,25 @@ class PatientViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
 
     def get_queryset(self):
-        """Filter patients by user permissions."""
+        """Filter patients by user permissions with strict agency isolation."""
         user = self.request.user
-        # Agency admins can see all patients in their agency, superadmins see all
+        
+        # Superadmins can see all patients
         if hasattr(user, 'role') and user.role == 'superadmin':
             return Patient.objects.all()
-        elif hasattr(user, 'role') and user.role in ['agency_admin', 'qa_compliance']:
+        
+        # Agency admins, QA/Compliance can only see patients in their agency
+        if hasattr(user, 'role') and user.role in ['agency_admin', 'qa_compliance', 'clinical_leadership']:
+            if not user.agency:
+                return Patient.objects.none()
             return Patient.objects.filter(agency=user.agency)
-        return Patient.objects.filter(created_by=user)
+        
+        # Clinicians can only see patients in their agency
+        if user.agency:
+            return Patient.objects.filter(agency=user.agency)
+        
+        # Fallback: no access
+        return Patient.objects.none()
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -42,13 +53,30 @@ class PatientViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set the created_by user and associated agency."""
         user = self.request.user
-        # Set the agency based on the user's agency
-        serializer.save(created_by=user, agency=user.agency)
+        # Ensure agency is set from the user's agency
+        agency = user.agency
+        serializer.save(created_by=user, agency=agency)
+
+    def get_object(self):
+        """Override to ensure users can only access patients in their agency."""
+        obj = super().get_object()
+        user = self.request.user
+        
+        # Superadmins can access any patient
+        if hasattr(user, 'role') and user.role == 'superadmin':
+            return obj
+        
+        # All other users can only access patients in their agency
+        if user.agency and obj.agency != user.agency:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to access this patient.")
+        
+        return obj
 
     @action(detail=False, methods=['get'])
     def search(self, request):
         """
-        Search patients by name or email.
+        Search patients by name or email (agency-scoped).
         """
         query = request.query_params.get('q', '')
         if query:
@@ -66,7 +94,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_patients(self, request):
         """
-        Get patients created by the current user.
+        Get patients created by the current user (agency-scoped).
         """
         patients = self.get_queryset().filter(created_by=request.user)
         serializer = self.get_serializer(patients, many=True)

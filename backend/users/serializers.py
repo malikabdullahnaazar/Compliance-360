@@ -15,6 +15,9 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
     def get_agency_name(self, obj):
+        # Superadmins don't belong to any agency
+        if obj.role == 'superadmin':
+            return None
         return obj.agency.name if obj.agency else None
 
     def create(self, validated_data):

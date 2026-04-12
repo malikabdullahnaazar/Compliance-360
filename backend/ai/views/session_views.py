@@ -38,16 +38,26 @@ OPENAI_FILE_SIZE_LIMIT_MB = float(os.getenv("OPENAI_FILE_SIZE_LIMIT_MB", "500"))
 
 class AuditSessionViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing audit sessions.
+    ViewSet for managing audit sessions with strict agency-level data isolation.
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
-    
+
     def get_queryset(self):
-        """Filter audit sessions by user permissions."""
+        """Filter audit sessions by user permissions with strict agency isolation."""
         user = self.request.user
-        if hasattr(user, 'role') and user.role in ['superadmin', 'qa']:
+        
+        # Superadmins and QA can see all sessions
+        if hasattr(user, 'role') and user.role in ['superadmin', 'qa_compliance']:
             return AuditSession.objects.all()
+        
+        # Agency admins can see sessions in their agency
+        if hasattr(user, 'role') and user.role in ['agency_admin', 'clinical_leadership']:
+            if not user.agency:
+                return AuditSession.objects.none()
+            return AuditSession.objects.filter(agency=user.agency)
+        
+        # Others can only see sessions they created
         return AuditSession.objects.filter(created_by=user)
     
     def get_serializer_class(self):
@@ -59,8 +69,9 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
         return AuditSessionDetailSerializer
     
     def perform_create(self, serializer):
-        """Set the created_by user."""
-        serializer.save(created_by=self.request.user)
+        """Set the created_by user and associated agency."""
+        user = self.request.user
+        serializer.save(created_by=user, agency=user.agency)
     
     @action(detail=True, methods=['post'])
     def upload_document(self, request, pk=None):
@@ -198,6 +209,7 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
         location = finding_data.get('location_in_document', {})
         finding = ComplianceFinding.objects.create(
             audit_session=audit_session,
+            agency=audit_session.agency,
             check_number=finding_data.get('check_number', 0),
             category=finding_data.get('category', 'A'),
             severity=finding_data.get('severity', 'LOW'),

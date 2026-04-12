@@ -75,6 +75,20 @@ const Navbar = ({ variant = 'app', onMenuToggle }) => {
         <div className="flex items-center gap-1">
           {user && (
             <>
+              {/* Agency Name Display - Hidden for superadmins */}
+              {user.agency_name && user.role !== 'superadmin' && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+                  <ShieldCheck className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      Agency:
+                    </span>
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      {user.agency_name}
+                    </span>
+                  </div>
+                </div>
+              )}
               <Link
                 to="/"
                 className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"

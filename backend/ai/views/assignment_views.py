@@ -22,7 +22,7 @@ class AssignedAuditReportView(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'], url_path='assign')
     def assign(self, request):
-        """Creates an AssignedAuditReport record."""
+        """Creates an AssignedAuditReport record with agency."""
         result_id = request.data.get('analysis_result_id')
         clinician_id = request.data.get('clinician_id')
 
@@ -33,8 +33,13 @@ class AssignedAuditReportView(viewsets.ViewSet):
             result = AIAnalysisResult.objects.get(id=result_id)
             clinician = CustomUser.objects.get(id=clinician_id, role='clinician')
             
+            # Verify user has access to this result
+            if request.user.agency and result.agency != request.user.agency:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
             assignment = AssignedAuditReport.objects.create(
                 analysis_result=result,
+                agency=request.user.agency,  # Set agency
                 assigned_by=request.user,
                 assigned_to=clinician,
             )
@@ -44,14 +49,23 @@ class AssignedAuditReportView(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='assigned')
     def list_assigned(self, request):
-        """Lists assignments based on user logic."""
+        """Lists assignments based on user logic with agency filtering."""
         user = request.user
         qs = AssignedAuditReport.objects.select_related('analysis_result', 'assigned_to')
-        
+
+        # Apply agency-level filtering
         if getattr(user, 'role', None) == 'clinician':
+            # Clinicians see only their own assignments
             qs = qs.filter(assigned_to=user)
+        elif getattr(user, 'role', None) == 'superadmin':
+            # Superadmins see all assignments
+            pass
         elif getattr(user, 'agency', None):
-            qs = qs.filter(analysis_result__patient__agency=user.agency)
+            # Agency users see assignments in their agency
+            qs = qs.filter(agency=user.agency)
+        else:
+            # Users without agency see nothing
+            qs = qs.none()
 
         data = []
         for a in qs:
@@ -65,7 +79,7 @@ class AssignedAuditReportView(viewsets.ViewSet):
 
     @action(detail=True, methods=['get'], url_path='detail')
     def get_detail(self, request, pk=None):
-        """GET /api/ai/mistral/assigned/<id>/detail/"""
+        """GET /api/ai/mistral/assigned/<id>/detail/ with agency verification."""
         user = request.user
         try:
             a = AssignedAuditReport.objects.select_related(
@@ -75,6 +89,12 @@ class AssignedAuditReportView(viewsets.ViewSet):
         except AssignedAuditReport.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Verify agency access
+        if user.role != 'superadmin':
+            if a.agency and user.agency != a.agency:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Clinicians can only see their own assignments
         if getattr(user, 'role', None) == 'clinician' and a.assigned_to != user:
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -152,8 +172,16 @@ class AssignedAuditReportView(viewsets.ViewSet):
         """GET /api/ai/mistral/clinicians/ – return clinician users in admin's agency"""
         user = request.user
         qs = CustomUser.objects.filter(role='clinician', is_active=True)
-        if getattr(user, 'agency', None):
-            qs = qs.filter(agency=user.agency)
+        
+        # Superadmins see all clinicians
+        if getattr(user, 'role', None) != 'superadmin':
+            # All other users only see clinicians in their agency
+            if getattr(user, 'agency', None):
+                qs = qs.filter(agency=user.agency)
+            else:
+                # Users without agency see no clinicians
+                qs = qs.none()
+        
         data = [
             {
                 'id': str(u.id),
