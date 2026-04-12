@@ -1,5 +1,5 @@
 """
-Compliance 360 – AI Service Tests
+CompliAI Chart – AI Service Tests
 ===================================
 Tests for both Dev (Mistral) and Prod (OpenAI) environments.
 

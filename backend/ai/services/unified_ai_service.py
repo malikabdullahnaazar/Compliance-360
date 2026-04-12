@@ -1,5 +1,5 @@
 """
-Unified AI Service for Compliance 360
+Unified AI Service for CompliAI Chart
 ──────────────────────────────────────
 Routes to the correct AI backend depending on APP_ENV:
   • Dev  → Mistral AI  (open-mistral-nemo)  – cost-free / low-cost
@@ -159,6 +159,58 @@ class _OpenAIBackend:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Google backend (Prod / Gemini)
+# ═══════════════════════════════════════════════════════════════════════════════
+class _GoogleBackend:
+    """
+    Uses Google Gemini (e.g., Gemini 2.0 Pro) for clinical analysis.
+    """
+
+    def __init__(self):
+        import google.generativeai as genai
+
+        api_key = os.getenv("GOOGLE_API_KEY", "").strip().strip('"')
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY not set")
+        
+        genai.configure(api_key=api_key)
+        
+        # Model mapping for human-friendly names in .env
+        raw_model = os.getenv("GOOGLE_MODEL", "gemini-2.0-pro").strip()
+        if "Gemini 2.0 Pro" in raw_model:
+            self._model_id = "gemini-2.0-pro-exp-02-05"
+        else:
+            self._model_id = raw_model
+            
+        self.model = genai.GenerativeModel(
+            model_name=self._model_id,
+            system_instruction=_SYSTEM_PROMPT
+        )
+        logger.info(f"[Prod] Google backend initialised – model: {self._model_id}")
+
+    def analyze_documents(self, documents: List[Dict], patient_info: Dict) -> str:
+        user_message = _build_user_message(documents, patient_info)
+        response = self.model.generate_content(
+            user_message,
+            generation_config= {
+                "temperature": 0.1,
+                "max_output_tokens": 8192,
+            }
+        )
+        
+        content = response.text
+        logger.info(
+            f"[Prod/Google] Analysis complete – patient {patient_info.get('patient_id')} "
+            f"– {len(documents)} docs – model: {self._model_id}"
+        )
+        return content
+
+    @property
+    def model_name(self) -> str:
+        return self._model_id
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Unified service facade
 # ═══════════════════════════════════════════════════════════════════════════════
 class UnifiedAIService:
@@ -173,8 +225,13 @@ class UnifiedAIService:
         self.is_prod = app_env == "prod"
 
         if self.is_prod:
-            self._backend = _OpenAIBackend()
-            logger.info("UnifiedAIService: PRODUCTION mode – using OpenAI")
+            use_model = os.getenv("USE_MODEL", "OpenAI").strip().lower()
+            if use_model == "google":
+                self._backend = _GoogleBackend()
+                logger.info("UnifiedAIService: PRODUCTION mode – using Google Gemini")
+            else:
+                self._backend = _OpenAIBackend()
+                logger.info("UnifiedAIService: PRODUCTION mode – using OpenAI")
         else:
             self._backend = _MistralBackend()
             logger.info("UnifiedAIService: DEVELOPMENT mode – using Mistral AI")

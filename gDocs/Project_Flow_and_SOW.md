@@ -1,10 +1,10 @@
-# Compliance 360 – Hospice Clinical Chart Review System
+# CompliAI Chart – Hospice Clinical Chart Review System
 ## Project Flow, Scope of Work (SOW), and Implementation Strategy
 
 ---
 
 ### 1. Introduction & Project Goal
-**Compliance 360** is an AI-powered compliance auditor designed for hospice agencies. The system automates the review of patient clinical charts (PDFs) to detect regulatory deficiencies, map them to specific citations (CMS, CHAP, HHSC, etc.), and provide structured correction guidance.
+**CompliAI Chart** is an AI-powered compliance auditor designed for hospice agencies. The system automates the review of patient clinical charts (PDFs) to detect regulatory deficiencies, map them to specific citations (CMS, CHAP, HHSC, etc.), and provide structured correction guidance.
 
 **Objective:** Ensure hospice agencies are "survey-ready" by identifying high-risk documentation gaps before official audits occur.
 
@@ -114,4 +114,4 @@ The AI will strictly monitor the following **40 High-Risk Checks** (derived from
 
 ---
 **Prepared by:** Senior Developer / AI Architect
-**Project:** Compliance 360
+**Project:** CompliAI Chart

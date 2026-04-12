@@ -205,4 +205,4 @@ python manage.py test ai
 
 ## License
 
-Private - Compliance 360 Hospice System
+Private - CompliAI Chart Hospice System

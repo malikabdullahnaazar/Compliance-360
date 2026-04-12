@@ -11,4 +11,5 @@ pillow>=10.0.0
 pytesseract>=0.3.10
 pydantic>=2.0.0
 django-filter
+google-generativeai
 

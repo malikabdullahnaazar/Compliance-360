@@ -89,7 +89,7 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       case 'qa_compliance':
         return 'QA/Compliance Officer';
       default:
-        return 'Compliance 360';
+        return 'CompliAI Chart';
     }
   };
 

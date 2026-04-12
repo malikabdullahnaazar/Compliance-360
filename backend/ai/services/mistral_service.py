@@ -1,5 +1,5 @@
 """
-Mistral AI Service for Compliance 360
+Mistral AI Service for CompliAI Chart
 ──────────────────────────────────────
 DEPRECATED: This module is kept for backward compatibility.
 New code should use unified_ai_service.get_unified_ai_service() instead,

@@ -1,5 +1,5 @@
 """
-OpenAI Service for Compliance 360 AI Auditor
+OpenAI Service for CompliAI Chart AI Auditor
 Handles document analysis using GPT-4o model
 """
 

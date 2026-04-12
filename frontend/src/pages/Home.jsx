@@ -89,24 +89,24 @@ const Home = () => (
           ].map((feature) => {
             const FeatureIcon = feature.icon;
             return (
-            <Card
-              key={feature.title}
-              className="group relative overflow-hidden rounded-2xl p-8 hover:shadow-xl hover:-translate-y-1 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-teal-50/50 to-transparent dark:from-teal-900/10 dark:to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
-              <div className="relative">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25">
-                  <FeatureIcon className="h-6 w-6" aria-hidden="true" />
+              <Card
+                key={feature.title}
+                className="group relative overflow-hidden rounded-2xl p-8 hover:shadow-xl hover:-translate-y-1 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-teal-50/50 to-transparent dark:from-teal-900/10 dark:to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
+                <div className="relative">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25">
+                    <FeatureIcon className="h-6 w-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="mt-5 text-xl font-bold text-gray-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="mt-3 text-gray-600 dark:text-gray-300 leading-relaxed">
+                    {feature.body}
+                  </p>
                 </div>
-                <h3 className="mt-5 text-xl font-bold text-gray-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-                  {feature.title}
-                </h3>
-                <p className="mt-3 text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {feature.body}
-                </p>
-              </div>
-            </Card>
-          );
+              </Card>
+            );
           })}
         </div>
       </div>
@@ -118,7 +118,7 @@ const Home = () => (
           Ready to simplify compliance?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-lg text-teal-100">
-          Join teams that ship audit-ready programs faster with Compliance 360.
+          Join teams that ship audit-ready programs faster with CompliAI Chart.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6">
           <Button as={Link} to="/login" size="lg" className="bg-white text-teal-700 hover:bg-gray-50 border-0 shadow-xl hover:shadow-2xl hover:-translate-y-0.5">
