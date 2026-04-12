@@ -3,7 +3,9 @@ djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
 openai>=1.0.0
-mistralai
+langchain
+langchain-openai
+langchain-google-genai
 python-dotenv>=1.0.0
 pypdf>=4.0.0
 pdf2image>=1.17.0

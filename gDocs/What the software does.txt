@@ -1,0 +1,196 @@
+1) What the software does
+Core outcomes
+1.	Ingest a hospice chart (documents + structured data).
+2.	User selects one or more frameworks: CMS / HHSC / ACHC / Joint Commission / CHAP.
+3.	Software runs a standards-aware audit:
+o	Identifies missing/late/inconsistent documentation
+o	Detects conflicts across notes/orders/med lists/eligibility
+o	Verifies required elements by discipline and timeline
+4.	Outputs:
+o	Deficiency list (severity + citation + rationale + evidence)
+o	Recommended correction plan (what to add/clarify + where + who + by when)
+o	Audit report package (internal QA + survey-ready exports)
+Important guardrail: the system should recommend documentation fixes and highlight what must be clarified, but avoid “fabricating” clinical facts. The UI should prompt staff to confirm factual accuracy before anything is added to the record.
+________________________________________
+2) User experience and workflow
+A. Setup (Admin)
+•	Configure agency profile: locations, teams, EMR type, disciplines used, service lines.
+•	Load policies/templates (optional): agency-specific forms, phrasing, and internal QA thresholds.
+•	Choose framework defaults (e.g., “CMS + ACHC” or “CMS only”).
+B. Audit creation (QA user)
+1.	Select patient / chart or upload a chart bundle (PDFs + exports).
+2.	Choose accreditation body (one or multiple).
+3.	Choose audit type:
+o	Admission audit
+o	Eligibility/recertification audit
+o	Routine visit audit
+o	IDG/POC audit
+o	Discharge/transfer audit
+o	“Survey readiness” full chart audit
+4.	Start audit.
+C. Results (QA + Clinical leaders)
+•	Dashboard summary: pass rate, high-risk items, timeliness issues, top recurring deficiencies.
+•	Chart view with:
+o	Deficiency cards (what’s wrong, where found, what’s missing, standard reference)
+o	Evidence links (note excerpts, dates, signature metadata)
+o	“Fix guidance” (what to correct + suggested wording prompts)
+o	Assignments (RN case manager, social worker, chaplain, medical director)
+o	Due dates + escalation rules
+D. Correction support (Clinical staff)
+•	“Correction wizard” per deficiency:
+o	What needs clarification
+o	What documentation elements must be present
+o	What can be amended vs what requires an addendum
+o	Signature/attestation requirements
+•	Export: corrective action plan (CAPA), education needs, and re-audit scheduling.
+________________________________________
+3) Standards engine design (multi-framework)
+Key idea: one clinical requirement, multiple mappings
+Build a Common Requirement Library (CRL) that defines each “audit check” once, then maps it to the standards of each body.
+Example CRL concept (non-code description):
+•	Requirement: “Hospice eligibility supported by terminal prognosis + documentation of clinical decline”
+•	Evidence types: physician narrative, CTI, LCD/clinical indicators, supporting notes
+•	Timing: at admission and each recert
+•	Mapping:
+o	CMS: hospice CoPs & LCD alignment
+o	ACHC: eligibility documentation standards
+o	Joint Commission: record of care & assessment/communication elements
+o	CHAP: patient record & care planning requirements
+o	HHSC: state-specific hospice rules (Texas)
+Versioning (critical)
+Accreditation standards change. Your system must support:
+•	Effective dates
+•	“Framework version” selection (current vs prior)
+•	Audit reproducibility (“this audit ran under CMS CoPs interpretation set vX.Y on date Z”)
+Severity model
+•	Critical / Immediate jeopardy risk
+•	Major
+•	Moderate
+•	Minor
+•	Advisory (best practice; not a cite)
+________________________________________
+4) What gets audited (hospice chart checklist categories)
+These categories become audit modules, each with framework-specific rules.
+Patient eligibility & election
+•	Hospice election statement completeness
+•	Attending physician selection
+•	Notice of election / revocation / transfer rules
+•	Face-to-face encounter for applicable recerts (timing + required elements)
+•	CTI completeness and signatures
+Assessments & care planning
+•	Comprehensive assessment timeliness and completeness
+•	Initial RN assessment and ongoing assessments
+•	Updated plan of care cadence
+•	Patient/family goals, symptoms, interventions linked to assessment
+•	IDG participation and review cadence; documentation of IDG decisions
+Orders and medication management
+•	Medication profile completeness
+•	Hospice-related vs unrelated meds documented
+•	Orders present, dated, signed; verbal/telephone order requirements
+•	Comfort kit standing orders documentation
+•	Allergies, interactions, high-risk meds monitoring (as required)
+Visit documentation (by discipline)
+•	RN, SW, Chaplain, HHA, Therapy (if used)
+•	Visit frequency compliance to POC
+•	Missed visits documentation and follow-up
+•	Interventions and symptom response documented
+Symptom management / clinical consistency checks
+•	Pain assessment scales and reassessment
+•	Dyspnea, anxiety, nausea, constipation protocols
+•	Decline indicators over time consistent across notes and recert rationale
+•	Falls, wounds, infection monitoring where applicable
+Patient rights & consents
+•	HIPAA/consents, patient rights acknowledgement
+•	Advance directives, DNR documentation
+•	Complaint/grievance process documentation
+Coordination of care
+•	Communication with attending physician, facility, caregivers
+•	Medication changes communicated and reconciled
+•	Hospitalization/ED transitions documented
+Discharge / death / bereavement
+•	Live discharge criteria documentation
+•	Death visit documentation, pronouncement workflows if applicable
+•	Bereavement risk assessment and follow-up plan
+________________________________________
+5) Correction guidance engine (how you “offer corrections” safely)
+Instead of “auto-writing” clinical content, generate structured correction guidance:
+For each deficiency, provide:
+•	What’s missing (data elements)
+•	Why it matters (risk + standard mapping)
+•	Where to document (form/note type)
+•	Who must complete (role)
+•	How to correct (addendum vs late entry vs new note)
+•	Suggested prompts staff must answer (to ensure truthfulness)
+•	Optional: compliant phrasing templates with placeholders
+Example guidance pattern:
+•	“Document X” + “Include A, B, C” + “Must be dated/signed by role Y” + “Must align with Z elsewhere in chart”
+________________________________________
+6) Data ingestion (EMR + documents)
+Inputs you should support
+1.	Structured exports (preferred): demographics, episodes, orders, meds, visit logs, assessments.
+2.	Documents/PDFs: scanned consents, signed orders, CTIs, election statements.
+3.	HL7/FHIR where available.
+4.	Manual upload for small agencies.
+Extraction pipeline
+•	Document classification (CTI, election, POC, visit note, medication list, IDG note, etc.)
+•	Metadata extraction (dates, signatures, author role)
+•	Clinical concept extraction (diagnoses, symptoms, scales, decline terms)
+________________________________________
+7) System architecture (recommended)
+Components
+•	Web App (Role-based UI)
+o	QA dashboard, chart viewer, deficiency workflow, reporting, admin standard sets
+•	Audit Orchestrator
+o	Runs audit jobs, tracks versions, produces results
+•	Rules/Standards Service
+o	CRL requirement definitions + mappings to CMS/HHSC/ACHC/TJC/CHAP
+o	Versioning & release management
+•	Evidence Service
+o	Stores extracted findings with links back to source documents/snippets
+•	Recommendation Service
+o	Generates correction guidance, CAPA suggestions, training themes
+•	Reporting Service
+o	Survey-ready reports, trend analytics, re-audit outcomes
+•	Secure Storage
+o	PHI-safe document storage + audit logs
+Security and compliance (non-negotiable)
+•	HIPAA-aligned controls: encryption at rest/in transit, least privilege RBAC, audit trails
+•	Tenant isolation (each agency separate)
+•	Data retention policies + legal hold support
+•	“No fabrication” guardrails and mandatory human attestation before exporting “corrections”
+________________________________________
+8) Data model (minimum needed)
+•	Agency, Location, Users, Roles
+•	Patient, Episode, Admission/Recert periods
+•	Chart Artifact (document/note/order/assessment)
+•	Extracted Evidence (field/value/date/source link/confidence)
+•	Audit (frameworks selected, version, timestamp)
+•	Findings (requirement id, deficiency type, severity, evidence refs, due date, assignee)
+•	Corrections (tasks, status, notes, attestation, re-audit results)
+________________________________________
+9) MVP scope you can ship first (fast path)
+MVP1 (high value, manageable)
+•	Framework selection: CMS + one accreditor (choose ACHC or CHAP first)
+•	Audit modules:
+o	Eligibility/CTI/recert timing
+o	Election statement completeness
+o	POC + IDG cadence
+o	Orders/signatures/timeliness
+•	Outputs: deficiency list + correction guidance + PDF report
+MVP2
+•	Add remaining frameworks (HHSC, Joint Commission, CHAP/ACHC whichever not chosen)
+•	Add advanced consistency checks (decline narrative alignment, meds reconciliation)
+•	Add CAPA workflow + trend dashboards
+MVP3
+•	EMR integrations + FHIR/HL7
+•	Benchmarking across agency locations
+•	Automated training recommendations and policy linkage
+________________________________________
+10) What I can produce next (immediately useful artifacts)
+If you want, I can draft the following in your next message:
+•	A feature-by-feature PRD (product requirements doc)
+•	A requirements matrix template (CRL + mapping to CMS/HHSC/ACHC/TJC/CHAP)
+•	A starter set of audit checks (20–40 high-impact requirements) organized by module
+•	A screen-by-screen UI wireframe outline (pages, components, permissions)
+•	A database schema outline and API endpoints list
+

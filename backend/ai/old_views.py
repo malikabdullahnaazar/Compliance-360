@@ -41,15 +41,15 @@ from .serializers import (
     SingleDocumentAnalysisSerializer,
     DocumentUploadSerializer
 )
-from .services.ai_service import get_ai_service
+from .services.langchain_service import get_compliance_service
 from .services.document_processor import get_document_processor
-from .services.unified_ai_service import get_unified_ai_service, OPENAI_FILE_SIZE_LIMIT_MB
 
 logger = logging.getLogger(__name__)
 
 # Read APP_ENV once at module level
 _APP_ENV = os.getenv('APP_ENV', 'Dev').strip().lower()
 _IS_PROD = _APP_ENV == 'prod'
+OPENAI_FILE_SIZE_LIMIT_MB = float(os.getenv("OPENAI_FILE_SIZE_LIMIT_MB", "500"))
 
 
 class AuditSessionViewSet(viewsets.ModelViewSet):
@@ -275,7 +275,7 @@ class AuditSessionViewSet(viewsets.ModelViewSet):
             
             # Run AI analysis
             start_time = time.time()
-            ai_service = get_ai_service()
+            ai_service = get_compliance_service()
             
             result = ai_service.analyze_documents(
                 documents=ai_documents,
@@ -722,7 +722,7 @@ class AIAuditAPIView(viewsets.ViewSet):
             data = serializer.validated_data
             
             # Run AI analysis
-            ai_service = get_ai_service()
+            ai_service = get_compliance_service()
             result = ai_service.analyze_documents(
                 documents=data['documents'],
                 audit_type=data['audit_type'],
@@ -751,11 +751,13 @@ class AIAuditAPIView(viewsets.ViewSet):
         try:
             data = serializer.validated_data
             
-            ai_service = get_ai_service()
-            result = ai_service.analyze_single_document(
-                document_content=data['document_content'],
-                document_type=data['document_type'],
-                frameworks=data.get('frameworks', ['CMS', 'CHAP']),
+            ai_service = get_compliance_service()
+            result = ai_service.analyze_documents(
+                documents=[{
+                    'content': data['document_content'],
+                    'type': data['document_type'],
+                    'filename': 'single_document.txt'
+                }],
                 patient_id=data.get('patient_id')
             )
             
@@ -795,11 +797,13 @@ class AIAuditAPIView(viewsets.ViewSet):
             )
             
             # Analyze
-            ai_service = get_ai_service()
-            result = ai_service.analyze_single_document(
-                document_content=processed['content'],
-                document_type=document_type,
-                frameworks=frameworks
+            ai_service = get_compliance_service()
+            result = ai_service.analyze_documents(
+                documents=[{
+                    'content': processed['content'],
+                    'type': document_type,
+                    'filename': uploaded_file.name
+                }]
             )
             
             # Add extraction metadata
