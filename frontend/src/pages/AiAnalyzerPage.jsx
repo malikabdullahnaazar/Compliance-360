@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Brain, FileText, X, Save, ChevronDown, AlertTriangle,
     Search, ChevronUp, Calendar, Cpu, FileStack, Users, ChevronLeft, ChevronRight, CheckCircle, XCircle,
-    UserCheck, ClipboardList, Clock, FileCheck, ExternalLink
+    UserCheck, ClipboardList, Clock, FileCheck, ExternalLink, Loader2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -22,10 +22,11 @@ import api from '../services/api';
 const analyzeDocuments = (patientId, documentIds) =>
     api.post('/ai/mistral/analyze/', { patient_id: patientId, document_ids: documentIds });
 const saveResult = (payload) => api.post('/ai/mistral/save/', payload);
-const fetchResults = (patientId) =>
-    api.get('/ai/mistral/results/', { params: patientId ? { patient_id: patientId } : {} });
+const fetchResults = (params = {}) =>
+    api.get('/ai/mistral/results/', { params });
 const fetchClinicians = () => api.get('/ai/mistral/clinicians/');
 const assignReport = (payload) => api.post('/ai/mistral/assign/', payload);
+const markAsPass = (resultId) => api.post(`/ai/mistral/results/${resultId}/mark_as_pass/`);
 
 /* ─── Shared Markdown config ──────────────────────────────────────────────── */
 const MD_PLUGINS = [remarkGfm, remarkBreaks];
@@ -112,11 +113,11 @@ const mdComponents = {
     ),
 };
 
-/* ─── SearchablePatientSelect ─────────────────────────────────────────────── */
+/* ─── SearchablePatientSelect (backend-driven, paginated) ─────────────────── */
 /**
- * A fully accessible searchable dropdown replacement for native <select>.
+ * A searchable dropdown that fetches patients from the backend on search
+ * and supports "See More" pagination.
  * Props:
- *   patients      – array of patient objects
  *   value         – currently selected patient id
  *   onChange      – (id: string) => void
  *   placeholder   – string shown when nothing is selected
@@ -124,7 +125,6 @@ const mdComponents = {
  *   allOption     – string | null  (pass a string to show an "All patients" option)
  */
 const SearchablePatientSelect = ({
-    patients,
     value,
     onChange,
     placeholder = 'Select a patient…',
@@ -133,6 +133,12 @@ const SearchablePatientSelect = ({
 }) => {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [patients, setPatients] = useState([]);
+    const [patientPage, setPatientPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const containerRef = useRef(null);
     const searchRef = useRef(null);
 
@@ -142,6 +148,7 @@ const SearchablePatientSelect = ({
             if (containerRef.current && !containerRef.current.contains(e.target)) {
                 setOpen(false);
                 setQuery('');
+                setDebouncedQuery('');
             }
         };
         document.addEventListener('mousedown', handler);
@@ -153,10 +160,55 @@ const SearchablePatientSelect = ({
         if (open && searchRef.current) searchRef.current.focus();
     }, [open]);
 
-    const filtered = patients.filter((p) => {
-        const name = `${p.first_name} ${p.last_name} ${p.patient_id}`.toLowerCase();
-        return name.includes(query.toLowerCase());
-    });
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(query);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    // Fetch patients from backend
+    const fetchPatients = useCallback(async (page = 1, append = false, search = '') => {
+        if (append) setLoadingMore(true);
+        else setLoading(true);
+
+        try {
+            const params = { page, page_size: 10 };
+            if (search) params.search = search;
+            const res = await patientService.getPatients(params);
+            const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : []);
+            const nextUrl = res.data?.next;
+            const hasMorePages = nextUrl !== null && nextUrl !== undefined;
+
+            if (append) {
+                setPatients(prev => [...prev, ...data]);
+            } else {
+                setPatients(data);
+            }
+            setHasMore(hasMorePages);
+            setPatientPage(page);
+        } catch {
+            // silent fail – empty list shown
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    }, []);
+
+    // Reset + fetch on search change
+    useEffect(() => {
+        if (open) {
+            fetchPatients(1, false, debouncedQuery);
+        }
+    }, [debouncedQuery, open]);
+
+    // Fetch on open
+    useEffect(() => {
+        if (open && patients.length === 0) {
+            fetchPatients(1, false, debouncedQuery);
+        }
+    }, [open]);
 
     const selectedPatient = patients.find((p) => p.id === value);
 
@@ -170,6 +222,13 @@ const SearchablePatientSelect = ({
         onChange(id);
         setOpen(false);
         setQuery('');
+        setDebouncedQuery('');
+    };
+
+    const handleLoadMore = () => {
+        if (hasMore && !loadingMore) {
+            fetchPatients(patientPage + 1, true, debouncedQuery);
+        }
     };
 
     return (
@@ -180,11 +239,11 @@ const SearchablePatientSelect = ({
                 disabled={disabled}
                 onClick={() => !disabled && setOpen((o) => !o)}
                 className={`w-full flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm
-          bg-white dark:bg-gray-800 text-left transition-colors
-          ${disabled ? 'opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700' :
+                    bg-white dark:bg-gray-800 text-left transition-colors
+                    ${disabled ? 'opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700' :
                         'border-gray-300 dark:border-gray-700 hover:border-teal-400 dark:hover:border-teal-500 cursor-pointer'}
-          ${open ? 'border-teal-500 ring-2 ring-teal-500/20 dark:border-teal-400' : ''}
-          text-gray-900 dark:text-white focus:outline-none`}
+                    ${open ? 'border-teal-500 ring-2 ring-teal-500/20 dark:border-teal-400' : ''}
+                    text-gray-900 dark:text-white focus:outline-none`}
             >
                 <span className={displayLabel ? '' : 'text-gray-400 dark:text-gray-500'}>
                     {displayLabel || placeholder}
@@ -199,12 +258,12 @@ const SearchablePatientSelect = ({
             {/* Dropdown panel */}
             {open && (
                 <div className="absolute z-[200] mt-1 w-full bg-white dark:bg-gray-800 rounded-xl
-          border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden">
+                    border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden">
 
                     {/* Search input */}
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700">
                         <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/50
-              rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
+                            rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
                             <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
                             <input
                                 ref={searchRef}
@@ -213,7 +272,7 @@ const SearchablePatientSelect = ({
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search patients…"
                                 className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white
-                  placeholder-gray-400 focus:outline-none"
+                                    placeholder-gray-400 focus:outline-none"
                             />
                         </div>
                     </div>
@@ -226,7 +285,7 @@ const SearchablePatientSelect = ({
                                     type="button"
                                     onClick={() => handleSelect('')}
                                     className={`w-full text-left px-4 py-2.5 text-sm transition-colors
-                    ${value === ''
+                                        ${value === ''
                                             ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 font-medium'
                                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                                 >
@@ -234,28 +293,57 @@ const SearchablePatientSelect = ({
                                 </button>
                             </li>
                         )}
-                        {filtered.length === 0 ? (
+                        {loading ? (
+                            <li className="px-4 py-6 flex justify-center">
+                                <Loader2 className="h-5 w-5 animate-spin text-teal-500" />
+                            </li>
+                        ) : patients.length === 0 ? (
                             <li className="px-4 py-4 text-sm text-gray-400 dark:text-gray-500 text-center">
-                                No patients match "{query}"
+                                No patients found
                             </li>
                         ) : (
-                            filtered.map((p) => (
-                                <li key={p.id}>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleSelect(p.id)}
-                                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors
-                      ${value === p.id
-                                                ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 font-medium'
-                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
-                                    >
-                                        <span className="font-medium">{p.first_name} {p.last_name}</span>
-                                        <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                                            {p.patient_id}
-                                        </span>
-                                    </button>
-                                </li>
-                            ))
+                            <>
+                                {patients.map((p) => (
+                                    <li key={p.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSelect(p.id)}
+                                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors
+                                                ${value === p.id
+                                                    ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 font-medium'
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+                                        >
+                                            <span className="font-medium">{p.first_name} {p.last_name}</span>
+                                            {p.date_of_birth && (
+                                                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                                                    DOB: {p.date_of_birth}
+                                                </span>
+                                            )}
+                                        </button>
+                                    </li>
+                                ))}
+                                {hasMore && (
+                                    <li>
+                                        <button
+                                            type="button"
+                                            onClick={handleLoadMore}
+                                            disabled={loadingMore}
+                                            className="w-full text-center px-4 py-2.5 text-sm text-teal-600 dark:text-teal-400
+                                                hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors disabled:opacity-50
+                                                flex items-center justify-center gap-1"
+                                        >
+                                            {loadingMore ? (
+                                                <>
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    Loading...
+                                                </>
+                                            ) : (
+                                                'See More'
+                                            )}
+                                        </button>
+                                    </li>
+                                )}
+                            </>
                         )}
                     </ul>
                 </div>
@@ -370,11 +458,9 @@ const AiAnalyzerPage = () => {
     const [activeTab, setActiveTab] = useState('analyze');
 
     /* Analyze tab */
-    const [patients, setPatients] = useState([]);
     const [selectedPatient, setSelectedPatient] = useState('');
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
-    const [loadingPatients, setLoadingPatients] = useState(false);
     const [loadingDocuments, setLoadingDocuments] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
 
@@ -385,9 +471,15 @@ const AiAnalyzerPage = () => {
 
     /* Results tab */
     const [resultPatient, setResultPatient] = useState('');
+    const [resultSearch, setResultSearch] = useState('');
     const [savedResults, setSavedResults] = useState([]);
     const [loadingResults, setLoadingResults] = useState(false);
     const [expandedResult, setExpandedResult] = useState(null);
+    // Results pagination (backend-driven)
+    const [resultsPage, setResultsPage] = useState(1);
+    const [resultsHasMore, setResultsHasMore] = useState(false);
+    const [resultsLoadingMore, setResultsLoadingMore] = useState(false);
+    const [resultsNextUrl, setResultsNextUrl] = useState(null);
 
     /* Assign modal */
     const [clinicians, setClinicians] = useState([]);
@@ -397,7 +489,11 @@ const AiAnalyzerPage = () => {
     const [showConfirmAssign, setShowConfirmAssign] = useState(false);
     const [assigning, setAssigning] = useState(false);
 
-    useEffect(() => { fetchPatients(); loadClinicians(); }, []);
+    /* Pass confirmation */
+    const [passTarget, setPassTarget] = useState(null); // { id, patientName }
+    const [markingPass, setMarkingPass] = useState(false);
+
+    useEffect(() => { loadClinicians(); }, []);
 
     // Restore tab + patient filter when navigating back from the report detail page
     useEffect(() => {
@@ -414,23 +510,30 @@ const AiAnalyzerPage = () => {
     }, []);
 
     useEffect(() => {
-        if (activeTab === 'result' || activeTab === 'passed') loadSavedResults();
+        if (activeTab === 'result' || activeTab === 'passed') {
+            // Reset pagination when switching tabs
+            setSavedResults([]);
+            setResultsPage(1);
+            setResultsHasMore(false);
+            setResultsNextUrl(null);
+            loadSavedResults(1, false);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab]);
 
-    /* ── data fetchers ── */
-    const fetchPatients = async () => {
-        try {
-            setLoadingPatients(true);
-            const res = await patientService.getPatients({ page_size: 200 });
-            setPatients(res.data?.results ?? (Array.isArray(res.data) ? res.data : []));
-        } catch {
-            dispatch(addToast({ type: 'error', message: 'Failed to fetch patients' }));
-        } finally {
-            setLoadingPatients(false);
+    // Reload results when patient filter changes
+    useEffect(() => {
+        if (activeTab === 'result' || activeTab === 'passed') {
+            setSavedResults([]);
+            setResultsPage(1);
+            setResultsHasMore(false);
+            setResultsNextUrl(null);
+            loadSavedResults(1, false);
         }
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resultPatient, activeTab]);
 
+    /* ── data fetchers ── */
     const fetchDocuments = async (patientId) => {
         if (!patientId) { setDocuments([]); setSelectedDocuments([]); return; }
         try {
@@ -445,15 +548,43 @@ const AiAnalyzerPage = () => {
         }
     };
 
-    const loadSavedResults = async () => {
-        setLoadingResults(true);
+    const loadSavedResults = async (page = 1, append = false) => {
+        if (append) setResultsLoadingMore(true);
+        else setLoadingResults(true);
         try {
-            const res = await fetchResults();
-            setSavedResults(res.data);
+            const params = { page, page_size: 10 };
+            if (resultPatient) params.patient_id = resultPatient;
+            if (resultSearch) params.search = resultSearch;
+            // Pass status filter based on active tab
+            if (activeTab === 'passed') {
+                params.status = 'Pass';
+            } else if (activeTab === 'result') {
+                params.status = 'Fail';
+            }
+
+            const res = await fetchResults(params);
+            const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : []);
+            const nextUrl = res.data?.next;
+
+            if (append) {
+                setSavedResults(prev => [...prev, ...data]);
+            } else {
+                setSavedResults(data);
+            }
+            setResultsHasMore(nextUrl !== null && nextUrl !== undefined);
+            setResultsNextUrl(nextUrl);
+            setResultsPage(page);
         } catch {
             dispatch(addToast({ type: 'error', message: 'Failed to load saved results' }));
         } finally {
             setLoadingResults(false);
+            setResultsLoadingMore(false);
+        }
+    };
+
+    const loadMoreResults = () => {
+        if (resultsHasMore && !resultsLoadingMore) {
+            loadSavedResults(resultsPage + 1, true);
         }
     };
 
@@ -504,6 +635,22 @@ const AiAnalyzerPage = () => {
         setShowConfirmAssign(false);
         setAssignTarget(null);
         setSelectedClinician('');
+    };
+
+    const handleMarkAsPass = async (resultId) => {
+        setMarkingPass(true);
+        try {
+            await markAsPass(resultId);
+            dispatch(addToast({ type: 'success', message: 'Report marked as Passed successfully!' }));
+            setSavedResults(prev => prev.map(result =>
+                result.id === resultId ? { ...result, status: 'Pass' } : result
+            ));
+            setPassTarget(null);
+        } catch (err) {
+            dispatch(addToast({ type: 'error', message: err?.response?.data?.error || 'Failed to mark report as Passed' }));
+        } finally {
+            setMarkingPass(false);
+        }
     };
 
     /* ── handlers ── */
@@ -667,11 +814,9 @@ const AiAnalyzerPage = () => {
                                             Select Patient
                                         </label>
                                         <SearchablePatientSelect
-                                            patients={patients}
                                             value={selectedPatient}
                                             onChange={handleAnalyzePatientChange}
                                             placeholder="Select a patient to analyze…"
-                                            disabled={loadingPatients}
                                         />
                                     </div>
 
@@ -777,10 +922,8 @@ const AiAnalyzerPage = () => {
 
                             {/* ── RESULTS & PASSED TAB ── */}
                             {(activeTab === 'result' || activeTab === 'passed') && (() => {
-                                const filteredResults = savedResults.filter(r =>
-                                    (!resultPatient || r.patient_id === resultPatient) &&
-                                    (activeTab === 'passed' ? r.status === 'Pass' : r.status !== 'Pass')
-                                );
+                                // Backend already filters by status + patient_id + search
+                                const filteredResults = savedResults;
 
                                 const groupedData = filteredResults.reduce((acc, r) => {
                                     if (!acc[r.patient_id]) {
@@ -802,11 +945,9 @@ const AiAnalyzerPage = () => {
                                                     Filter by Patient
                                                 </label>
                                                 <SearchablePatientSelect
-                                                    patients={patients}
                                                     value={resultPatient}
                                                     onChange={(id) => { setResultPatient(id); setExpandedResultPatient(id ? true : false); }}
                                                     placeholder="Filter by patient…"
-                                                    disabled={loadingPatients}
                                                     allOption="All Patients"
                                                 />
                                             </div>
@@ -901,6 +1042,20 @@ const AiAnalyzerPage = () => {
                                                                             {result.is_assigned ? "Assigned" : "Assign"}
                                                                         </button>
                                                                     )}
+                                                                    {result.status !== 'Pass' && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setPassTarget({ id: result.id, patientName: result.patient_name });
+                                                                            }}
+                                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/50 border-green-200 dark:border-green-800 cursor-pointer"
+                                                                            title="Manually mark this report as Passed"
+                                                                        >
+                                                                            <CheckCircle className="h-3.5 w-3.5" />
+                                                                            Pass
+                                                                        </button>
+                                                                    )}
                                                                     <ExternalLink
                                                                         className="h-4 w-4 text-gray-400 flex-shrink-0"
                                                                         title="Open full report"
@@ -909,6 +1064,28 @@ const AiAnalyzerPage = () => {
                                                             </div>
                                                         </Card>
                                                     ))}
+                                                    {resultsHasMore && (
+                                                        <div className="flex justify-center pt-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={loadMoreResults}
+                                                                disabled={resultsLoadingMore}
+                                                                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium
+                                                                    text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20
+                                                                    hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors
+                                                                    disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                {resultsLoadingMore ? (
+                                                                    <>
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                        Loading more...
+                                                                    </>
+                                                                ) : (
+                                                                    'See More'
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ) : groupedList.length === 0 ? (
@@ -924,22 +1101,46 @@ const AiAnalyzerPage = () => {
                                                 </p>
                                             </div>
                                         ) : (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                {groupedList.map((p) => (
-                                                    <Card key={p.patient_id} className="cursor-pointer hover:border-teal-400 transition-colors" onClick={() => { setResultPatient(p.patient_id); setExpandedResultPatient(true); }}>
-                                                        <CardContent className="p-5 flex items-center gap-4">
-                                                            <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center">
-                                                                <Users className="h-6 w-6 text-teal-600" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">{p.patient_name}</h3>
-                                                                <p className="text-sm text-gray-500">{p.count} Report{p.count > 1 ? 's' : ''}</p>
-                                                            </div>
-                                                            <ChevronRight className="h-5 w-5 text-gray-400" />
-                                                        </CardContent>
-                                                    </Card>
-                                                ))}
-                                            </div>
+                                            <>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                    {groupedList.map((p) => (
+                                                        <Card key={p.patient_id} className="cursor-pointer hover:border-teal-400 transition-colors" onClick={() => { setResultPatient(p.patient_id); setExpandedResultPatient(true); }}>
+                                                            <CardContent className="p-5 flex items-center gap-4">
+                                                                <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center">
+                                                                    <Users className="h-6 w-6 text-teal-600" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">{p.patient_name}</h3>
+                                                                    <p className="text-sm text-gray-500">{p.count} Report{p.count > 1 ? 's' : ''}</p>
+                                                                </div>
+                                                                <ChevronRight className="h-5 w-5 text-gray-400" />
+                                                            </CardContent>
+                                                        </Card>
+                                                    ))}
+                                                </div>
+                                                {resultsHasMore && (
+                                                <div className="flex justify-center pt-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={loadMoreResults}
+                                                        disabled={resultsLoadingMore}
+                                                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium
+                                                                text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20
+                                                                hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors
+                                                                disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        {resultsLoadingMore ? (
+                                                            <>
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                                Loading more...
+                                                            </>
+                                                        ) : (
+                                                            'See More'
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            </>
                                         )}
                                     </div>
                                 );
@@ -1037,6 +1238,33 @@ const AiAnalyzerPage = () => {
                             <Button variant="outline" onClick={() => setShowConfirmAssign(false)} disabled={assigning} className="flex-1">Cancel</Button>
                             <Button variant="primary" onClick={handleConfirmAssign} disabled={assigning} className="flex-1">
                                 {assigning ? 'Assigning…' : 'OK, Assign'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Confirm Pass Modal ───────────────────────────────────────────── */}
+            {passTarget && (
+                <div className="fixed inset-0 z-[320] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setPassTarget(null)} />
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center border border-green-100 dark:border-green-900/30">
+                        <div className="h-14 w-14 rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+                            <CheckCircle className="h-7 w-7 text-green-600 dark:text-green-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Confirm Manual Pass</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5 leading-relaxed">
+                            Are you sure you want to manually mark this report for <span className="font-semibold text-gray-800 dark:text-white">{passTarget.patientName}</span> as Passed? This will move it to the Passed section.
+                        </p>
+                        <div className="flex gap-3">
+                            <Button variant="outline" onClick={() => setPassTarget(null)} disabled={markingPass} className="flex-1">Cancel</Button>
+                            <Button
+                                variant="primary"
+                                onClick={() => handleMarkAsPass(passTarget.id)}
+                                disabled={markingPass}
+                                className="flex-1 bg-green-600 hover:bg-green-700 border-green-600 text-white"
+                            >
+                                {markingPass ? 'Processing…' : 'Yes, Pass'}
                             </Button>
                         </div>
                     </div>

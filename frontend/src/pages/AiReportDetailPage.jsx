@@ -23,6 +23,7 @@ const fetchResultDetail = (id) => api.get(`/ai/mistral/results/${id}/detail/`);
 const fetchClinicians = () => api.get('/ai/mistral/clinicians/');
 const assignReport = (payload) => api.post('/ai/mistral/assign/', payload);
 const saveResult = (payload) => api.post('/ai/mistral/save/', payload);
+const markAsPass = (resultId) => api.post(`/ai/mistral/results/${resultId}/mark_as_pass/`);
 
 // Download clinician document via the AssignedAuditReport download endpoint
 const downloadAssignmentDoc = (assignmentId) =>
@@ -389,6 +390,10 @@ const AiReportDetailPage = () => {
     const [selectedClinician, setSelectedClinician] = useState('');
     const [assigning, setAssigning] = useState(false);
 
+    /* Pass confirmation */
+    const [showPassConfirm, setShowPassConfirm] = useState(false);
+    const [markingPass, setMarkingPass] = useState(false);
+
     /* Load data */
     useEffect(() => {
         const load = async () => {
@@ -506,6 +511,20 @@ const AiReportDetailPage = () => {
             dispatch(addToast({ type: 'error', message: err?.response?.data?.error || 'Failed to assign report' }));
         } finally {
             setAssigning(false);
+        }
+    };
+
+    const handleMarkAsPass = async () => {
+        setMarkingPass(true);
+        try {
+            await markAsPass(id);
+            dispatch(addToast({ type: 'success', message: 'Report marked as Passed successfully!' }));
+            setResult(prev => ({ ...prev, status: 'Pass' }));
+            setShowPassConfirm(false);
+        } catch (err) {
+            dispatch(addToast({ type: 'error', message: err?.response?.data?.error || 'Failed to mark report as Passed' }));
+        } finally {
+            setMarkingPass(false);
         }
     };
 
@@ -672,6 +691,19 @@ const AiReportDetailPage = () => {
                                                 ? <><CheckCircle className="h-4 w-4" /> Assigned</>
                                                 : <><UserCheck className="h-4 w-4" /> Assign</>
                                             }
+                                        </button>
+                                    )}
+
+                                    {/* Pass button (only Fail reports) */}
+                                    {!isPassed && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassConfirm(true)}
+                                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/50 border-green-200 dark:border-green-800 cursor-pointer"
+                                            title="Manually mark this report as Passed"
+                                        >
+                                            <CheckCircle className="h-4 w-4" />
+                                            Pass
                                         </button>
                                     )}
                                 </div>
@@ -920,7 +952,33 @@ const AiReportDetailPage = () => {
                     />
                 )
             }
-        </div >
+        {/* ── Confirm Pass Modal ── */}
+        {showPassConfirm && (
+            <div className="fixed inset-0 z-[320] flex items-center justify-center">
+                <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowPassConfirm(false)} />
+                <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center border border-green-100 dark:border-green-900/30">
+                    <div className="h-14 w-14 rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle className="h-7 w-7 text-green-600 dark:text-green-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Confirm Manual Pass</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5 leading-relaxed">
+                        Are you sure you want to manually mark this report for <span className="font-semibold text-gray-800 dark:text-white">{result.patient_name}</span> as Passed? This will move it to the Passed section.
+                    </p>
+                    <div className="flex gap-3">
+                        <Button variant="outline" onClick={() => setShowPassConfirm(false)} disabled={markingPass} className="flex-1">Cancel</Button>
+                        <Button 
+                            variant="primary" 
+                            onClick={handleMarkAsPass} 
+                            disabled={markingPass} 
+                            className="flex-1 bg-green-600 hover:bg-green-700 border-green-600 text-white"
+                        >
+                            {markingPass ? 'Processing…' : 'Yes, Pass'}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        )}
+    </div >
     );
 };
 

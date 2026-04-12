@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload,
@@ -7,7 +7,10 @@ import {
   CheckCircle,
   X,
   Paperclip,
-  ArrowLeft
+  ArrowLeft,
+  ChevronDown,
+  Search,
+  Loader2
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
@@ -25,34 +28,113 @@ const DocumentUploadPage = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [formData, setFormData] = useState({
     patientId: '',
-    documentType: '',
+    documentType: 'other',
     description: ''
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
 
+  // Patient dropdown state
   const [patients, setPatients] = useState([]);
+  const [patientPage, setPatientPage] = useState(1);
+  const [hasMorePatients, setHasMorePatients] = useState(true);
+  const [loadingPatients, setLoadingPatients] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchDebounce, setSearchDebounce] = useState('');
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
   const dispatch = useDispatch();
 
-  // Fetch patients from API
+  // Debounce search input
   useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        const response = await patientService.getPatients();
-        const data = response.data.results || response.data || [];
+    const timer = setTimeout(() => {
+      setSearchDebounce(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch patients (initial load + pagination + search)
+  const fetchPatients = useCallback(async (page = 1, append = false, query = '') => {
+    if (append && !loadingMore) setLoadingMore(true);
+    else if (!append) setLoadingPatients(true);
+
+    try {
+      const params = { page, page_size: 10 };
+      if (query) {
+        params.search = query;
+      }
+      const response = await patientService.getPatients(params);
+      const data = response.data.results || response.data || [];
+      const nextUrl = response.data?.next;
+      const hasMore = nextUrl !== null && nextUrl !== undefined;
+
+      if (append) {
+        setPatients(prev => [...prev, ...data]);
+      } else {
         setPatients(data);
-      } catch (error) {
-        console.error('Error fetching patients:', error);
+      }
+      setHasMorePatients(hasMore);
+      setPatientPage(page);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+      if (!append) {
         dispatch(addToast({ type: 'error', message: 'Failed to fetch patients' }));
       }
+    } finally {
+      setLoadingPatients(false);
+      setLoadingMore(false);
+    }
+  }, [dispatch, loadingMore]);
+
+  // Initial load
+  useEffect(() => {
+    fetchPatients(1, false, searchDebounce);
+  }, [searchDebounce]);
+
+  // Load more patients
+  const loadMorePatients = () => {
+    if (hasMorePatients && !loadingMore) {
+      fetchPatients(patientPage + 1, true, searchDebounce);
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowPatientDropdown(false);
+      }
     };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    fetchPatients();
-  }, [dispatch]);
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (showPatientDropdown && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showPatientDropdown]);
 
-  // Document types
+  // Handle patient selection
+  const handlePatientSelect = (patient) => {
+    setFormData(prev => ({ ...prev, patientId: patient.id }));
+    setShowPatientDropdown(false);
+    setSearchQuery('');
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.patientId;
+      return newErrors;
+    });
+  };
+
+  // Document types - "Other" at the top
   const documentTypes = [
+    { value: 'other', label: 'Other' },
     { value: 'election_statement', label: 'Election Statement' },
     { value: 'cti_initial', label: 'CTI - Initial' },
     { value: 'cti_recertification', label: 'CTI - Recertification' },
@@ -62,7 +144,6 @@ const DocumentUploadPage = () => {
     { value: 'f2f_encounter', label: 'Face-to-Face Encounter' },
     { value: 'clinical_notes', label: 'Clinical Notes' },
     { value: 'physician_orders', label: 'Physician Orders' },
-    { value: 'other', label: 'Other' },
   ];
 
   const handleFileChange = (e) => {
@@ -237,24 +318,100 @@ const DocumentUploadPage = () => {
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="patientId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Select Patient <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        id="patientId"
-                        name="patientId"
-                        value={formData.patientId}
-                        onChange={handleChange}
-                        className={`block w-full pl-3 pr-10 py-2 border ${errors.patientId ? 'border-red-300' : 'border-gray-300'
-                          } rounded-md leading-5 bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500`}
-                      >
-                        <option value="">Select a patient</option>
-                        {patients.map(patient => (
-                          <option key={patient.id} value={patient.id}>
-                            {patient.first_name} {patient.last_name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative" ref={dropdownRef}>
+                        {/* Selected patient display / trigger */}
+                        <button
+                          type="button"
+                          onClick={() => setShowPatientDropdown(!showPatientDropdown)}
+                          className={`block w-full pl-3 pr-10 py-2 border ${errors.patientId ? 'border-red-300' : 'border-gray-300'}
+                            rounded-md leading-5 bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white 
+                            focus:outline-none focus:ring-1 focus:ring-teal-500 text-left flex items-center justify-between`}
+                        >
+                          {formData.patientId ? (
+                            <span className="truncate">
+                              {patients.find(p => p.id === formData.patientId)?.first_name}{' '}
+                              {patients.find(p => p.id === formData.patientId)?.last_name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">Search or select a patient</span>
+                          )}
+                          <ChevronDown className="h-4 w-4 text-gray-400 ml-2 flex-shrink-0" />
+                        </button>
+
+                        {/* Dropdown panel */}
+                        {showPatientDropdown && (
+                          <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg max-h-72 overflow-hidden">
+                            {/* Search input */}
+                            <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                              <div className="relative">
+                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                  ref={searchInputRef}
+                                  type="text"
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  placeholder="Search patients..."
+                                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-md 
+                                    bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Patient list */}
+                            <div className="overflow-y-auto max-h-52">
+                              {loadingPatients ? (
+                                <div className="flex items-center justify-center py-6">
+                                  <Loader2 className="h-5 w-5 animate-spin text-teal-500" />
+                                </div>
+                              ) : patients.length === 0 ? (
+                                <div className="py-6 text-center text-sm text-gray-500">
+                                  No patients found
+                                </div>
+                              ) : (
+                                <>
+                                  {patients.map(patient => (
+                                    <button
+                                      key={patient.id}
+                                      type="button"
+                                      onClick={() => handlePatientSelect(patient)}
+                                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors
+                                        ${formData.patientId === patient.id ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' : 'text-gray-900 dark:text-white'}`}
+                                    >
+                                      {patient.first_name} {patient.last_name}
+                                      {patient.date_of_birth && (
+                                        <span className="ml-2 text-xs text-gray-400">
+                                          DOB: {patient.date_of_birth}
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))}
+                                  {hasMorePatients && (
+                                    <button
+                                      type="button"
+                                      onClick={loadMorePatients}
+                                      disabled={loadingMore}
+                                      className="w-full text-center px-3 py-2 text-sm text-teal-600 dark:text-teal-400 hover:bg-gray-100 dark:hover:bg-gray-700 
+                                        transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                                    >
+                                      {loadingMore ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          Loading...
+                                        </>
+                                      ) : (
+                                        'See More'
+                                      )}
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       {errors.patientId && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.patientId}</p>
                       )}
@@ -272,7 +429,6 @@ const DocumentUploadPage = () => {
                         className={`block w-full pl-3 pr-10 py-2 border ${errors.documentType ? 'border-red-300' : 'border-gray-300'
                           } rounded-md leading-5 bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500`}
                       >
-                        <option value="">Select document type</option>
                         {documentTypes.map(type => (
                           <option key={type.value} value={type.value}>
                             {type.label}
@@ -307,31 +463,37 @@ const DocumentUploadPage = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Upload Files <span className="text-red-500">*</span>
                   </label>
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-gray-300 rounded-md dark:border-gray-700">
+                  <div
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-gray-300 rounded-md dark:border-gray-700 
+                      cursor-pointer hover:border-teal-400 transition-colors"
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (e.dataTransfer.files) {
+                        handleFileChange({ target: { files: e.dataTransfer.files } });
+                      }
+                    }}
+                  >
                     <div className="space-y-1 text-center">
                       <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="flex text-sm text-gray-600 dark:text-gray-400">
-                        <label
-                          htmlFor="file-upload"
-                          className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-teal-600 hover:text-teal-500"
-                        >
-                          <span>Upload files</span>
-                          <input
-                            id="file-upload"
-                            name="file-upload"
-                            type="file"
-                            className="sr-only"
-                            accept=".pdf,.doc,.docx"
-                            multiple
-                            onChange={handleFileChange}
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="font-medium text-teal-600 hover:text-teal-500">Click to upload</span> or drag and drop
+                      </p>
                       <p className="text-xs text-gray-500">
                         PDF, DOC, DOCX – up to 100 MB per file.
                         <span className="text-yellow-600 font-medium"> Files larger than 20 MB may require Dev mode for AI analysis.</span>
                       </p>
+                      <input
+                        id="file-upload"
+                        name="file-upload"
+                        type="file"
+                        className="sr-only"
+                        accept=".pdf,.doc,.docx"
+                        multiple
+                        onChange={handleFileChange}
+                      />
                     </div>
                   </div>
                   {errors.files && (

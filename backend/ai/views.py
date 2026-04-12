@@ -1070,11 +1070,17 @@ class MistralAnalyzeView(viewsets.ViewSet):
     @action(detail=False, methods=['get'], url_path='results')
     def list_results(self, request):
         """
-        GET /api/ai/mistral/results/?patient_id=<uuid>
-        Returns all saved AI analysis results for a patient.
+        GET /api/ai/mistral/results/?patient_id=<uuid>&page=<int>&page_size=<int>&search=<str>
+        Returns all saved AI analysis results for a patient, with pagination and optional search.
         """
+        from rest_framework.pagination import PageNumberPagination
+
         patient_id = request.query_params.get('patient_id')
-        from django.db.models import Exists, OuterRef
+        search_query = request.query_params.get('search', '').strip()
+        page_size_param = request.query_params.get('page_size')
+        status_filter = request.query_params.get('status', '').strip()  # 'Pass' or 'Fail'
+
+        from django.db.models import Exists, OuterRef, Q
         qs = AIAnalysisResult.objects.select_related('patient', 'created_by').annotate(
             is_assigned=Exists(AssignedAuditReport.objects.filter(analysis_result=OuterRef('pk')))
         )
@@ -1090,8 +1096,35 @@ class MistralAnalyzeView(viewsets.ViewSet):
         if patient_id:
             qs = qs.filter(patient_id=patient_id)
 
+        # Filter by status (Pass or Fail)
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        # Server-side search by patient name
+        if search_query:
+            qs = qs.filter(
+                Q(patient__first_name__icontains=search_query) |
+                Q(patient__last_name__icontains=search_query)
+            )
+
+        qs = qs.order_by('-created_at')
+
+        # Apply pagination
+        paginator = PageNumberPagination()
+        if page_size_param:
+            try:
+                paginator.page_size = int(page_size_param)
+            except (ValueError, TypeError):
+                pass
+        else:
+            paginator.page_size = 10
+
+        page = paginator.paginate_queryset(qs, request)
+        if page is None:
+            return Response({'error': 'Invalid page number'}, status=status.HTTP_404_NOT_FOUND)
+
         data = []
-        for r in qs:
+        for r in page:
             # Fetch analyzed document records so the frontend can View/Download them
             analyzed_docs = AuditDocument.objects.filter(
                 patient=r.patient,
@@ -1145,7 +1178,7 @@ class MistralAnalyzeView(viewsets.ViewSet):
                 'clinician_assignment_id': clinician_assignment_id,
             })
 
-        return Response(data, status=status.HTTP_200_OK)
+        return paginator.get_paginated_response(data)
 
     @action(detail=False, methods=['get'], url_path='results/(?P<result_id>[^/.]+)/detail')
     def get_result_detail(self, request, result_id=None):
@@ -1283,7 +1316,42 @@ class MistralAnalyzeView(viewsets.ViewSet):
             response = FileResponse(open(file_path, 'rb'), content_type=content_type)
             response['Content-Disposition'] = f'inline; filename="{r.clinician_document_name}"'
             return response
-        raise Http404('File not found on server')
+    @action(detail=False, methods=['post'], url_path='results/(?P<result_id>[^/.]+)/mark_as_pass')
+    def mark_as_pass(self, request, result_id=None):
+        """
+        POST /api/ai/mistral/results/<id>/mark_as_pass/
+        Manually mark a failed report as Passed.
+        """
+        try:
+            r = AIAnalysisResult.objects.select_related('patient').get(pk=result_id)
+        except AIAnalysisResult.DoesNotExist:
+            return Response({'error': 'Result not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Permission check: Only superadmin, agency admin/QA, or the creator can mark as pass
+        user = request.user
+        if not getattr(user, 'is_superadmin', False):
+            if getattr(user, 'agency', None):
+                if r.patient.agency != user.agency:
+                    # Role check: only agency admins/QA can override
+                    if getattr(user, 'role', None) not in ['agency_admin', 'qa_compliance']:
+                         return Response({'error': 'Only admins can override reports'}, status=status.HTTP_403_FORBIDDEN)
+            elif r.created_by != user:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Update status to Pass
+        r.status = 'Pass'
+        
+        # Ensure latest document is associated (it already is via analyzed_document_names, 
+        # but we could also check if clinician submitted one and prioritize it if needed, 
+        # however standard pass just moves it to passed section)
+        
+        r.save()
+
+        return Response({
+            'id': str(r.id),
+            'status': r.status,
+            'message': 'Report marked as Passed successfully.'
+        }, status=status.HTTP_200_OK)
 
 
 class AssignedAuditReportView(viewsets.ViewSet):

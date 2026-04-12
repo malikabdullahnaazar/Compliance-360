@@ -32,6 +32,7 @@ urlpatterns = [
     path('mistral/results/<str:result_id>/detail/', MistralAnalyzeView.as_view({'get': 'get_result_detail'}), name='mistral-result-detail'),
     path('mistral/results/<str:result_id>/submit_document/', MistralAnalyzeView.as_view({'post': 'submit_clinician_document'}), name='mistral-submit-clinician-doc'),
     path('mistral/results/<str:result_id>/clinician_document/', MistralAnalyzeView.as_view({'get': 'download_clinician_document'}), name='mistral-download-clinician-doc'),
+    path('mistral/results/<str:result_id>/mark_as_pass/', MistralAnalyzeView.as_view({'post': 'mark_as_pass'}), name='mistral-mark-as-pass'),
     # Assignment endpoints
     path('mistral/assign/', AssignedAuditReportView.as_view({'post': 'assign'}), name='mistral-assign'),
     path('mistral/assigned/', AssignedAuditReportView.as_view({'get': 'list_assigned'}), name='mistral-list-assigned'),
