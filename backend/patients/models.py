@@ -24,34 +24,36 @@ class Patient(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Basic Information
+    # Basic Information (Required)
     first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100, blank=True, null=True)
+    last_name = models.CharField(max_length=100, default='')
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES)
-    phone = models.CharField(max_length=20)
-    email = models.EmailField()
-    
-    # Address Information
-    address = models.CharField(max_length=255)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    zip_code = models.CharField(max_length=10)
 
-    # Emergency Contact
-    emergency_contact_name = models.CharField(max_length=200, blank=True)
-    emergency_contact_phone = models.CharField(max_length=20, blank=True)
+    # Contact Information (Optional)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
 
-    # Insurance Information
-    insurance_provider = models.CharField(max_length=200, blank=True)
-    policy_number = models.CharField(max_length=100, blank=True)
+    # Address Information (Optional)
+    address = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    zip_code = models.CharField(max_length=10, blank=True, null=True)
 
-    # Medical Information
-    referring_physician = models.CharField(max_length=200, blank=True)
+    # Emergency Contact (Optional)
+    emergency_contact_name = models.CharField(max_length=200, blank=True, null=True)
+    emergency_contact_phone = models.CharField(max_length=20, blank=True, null=True)
+
+    # Insurance Information (Optional)
+    insurance_provider = models.CharField(max_length=200, blank=True, null=True)
+    policy_number = models.CharField(max_length=100, blank=True, null=True)
+
+    # Medical Information (Optional)
+    referring_physician = models.CharField(max_length=200, blank=True, null=True)
     admission_date = models.DateField(null=True, blank=True)
 
-    # Status
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Active')
+    # Status (Optional - has default)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Active', blank=True)
 
     # Created by
     created_by = models.ForeignKey(
