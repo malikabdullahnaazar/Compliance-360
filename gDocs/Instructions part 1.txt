@@ -1,0 +1,154 @@
+Here’s a concrete build plan you can hand to product + engineering, plus a starter requirements library + mapping approach that keeps CMS/CHAP/HHSC aligned without duplicating logic.
+________________________________________
+Product definition
+Users
+•	QA/Compliance (primary): runs audits, assigns fixes, produces survey-ready reports
+•	Clinical leaders (secondary): reviews trends, training, CAPA
+•	Clinicians (doers): resolves deficiencies via guided correction tasks
+Core promise
+“Upload/select a chart → choose CMS + CHAP (and optionally HHSC overlay) → get a compliant deficiency list with evidence + a safe correction plan (no fabrication) + Texas survey readiness reporting.”
+________________________________________
+MVP scope (Texas-first)
+Framework selection (v1)
+•	CMS (Hospice CoPs)
+•	CHAP hospice standards
+•	Texas HHSC overlay toggle (not a separate audit mode yet—acts as extra checks and reporting tags)
+Audit modules (v1)
+1.	Eligibility & Election
+2.	CTI/Recertification Timeliness
+3.	Plan of Care & IDG cadence
+4.	Orders/Signatures/Verbal order compliance
+5.	Discipline documentation completeness (RN/SW/Chaplain/HHA)
+6.	Patient rights/consents basics (Texas-friendly)
+Outputs (v1)
+•	Chart score + deficiency list (severity, citation mapping, evidence)
+•	Correction tasks (role-based) + due dates
+•	Exportable audit report (PDF) + CAPA summary (CSV/PDF)
+________________________________________
+Standards engine design (CMS + CHAP + HHSC overlay)
+“One requirement, many mappings”
+Create a Common Requirement Library (CRL): each requirement has:
+•	ID, title, description
+•	Trigger (admission / recert / every IDG / discharge)
+•	Evidence needed (doc types + fields)
+•	Pass/fail logic + timing rules
+•	Severity
+•	Mapping table: CMS / CHAP / HHSC references + interpretation notes
+This prevents “rewriting the same rule” three times.
+Versioning (required)
+Store:
+•	Framework name + version + effective date
+•	Interpretation set version (your internal “rule pack”)
+•	Audit run includes these versions so results are reproducible later.
+________________________________________
+Starter requirement set (high-impact “Texas-ready” checks)
+Below is a practical v1 CRL list (not exhaustive). Each becomes a rule with evidence links.
+A) Eligibility & Election
+1.	Election statement present and complete
+o	Required elements present; patient/representative signature and date; attending physician info; effective date.
+2.	Patient rights acknowledgment present
+3.	Initial certification of terminal illness (CTI) present
+o	Signed/dated by physician as required; within required timeframe.
+4.	Terminal prognosis rationale supported in record
+o	Clinical indicators consistent with diagnosis and narrative; avoid contradictions.
+B) Recertification / F2F
+5.	Recertification CTI present for each period
+6.	Face-to-Face encounter completed when required
+o	Timing + required elements + appropriate practitioner + attestation/signature rules.
+7.	Narrative supports ongoing eligibility
+o	Decline indicators across nursing notes vs recert narrative align (flag inconsistencies).
+C) Plan of Care & IDG
+8.	Comprehensive assessment timely and complete
+9.	Plan of Care initiated and updated on required cadence
+10.	IDG review documented with required cadence
+11.	IDG includes required disciplines / input
+12.	Goals/interventions tied to assessed problems
+•	No “orphan interventions” without assessment basis.
+D) Orders / Medication
+13.	All orders present, dated, signed
+14.	Verbal/telephone order documentation meets requirements
+15.	Medication profile present and reconciled
+16.	Hospice-related vs unrelated meds documented (if required by your policy/standard mapping)
+17.	Allergy documentation present
+18.	High-risk med monitoring prompts triggered (optional v1, strong v2)
+E) Visit documentation
+19.	RN visit documentation includes required elements
+20.	SW documentation includes psychosocial assessment / interventions
+21.	Chaplain/spiritual care documentation present when on POC
+22.	HHA care consistent with aide plan
+23.	Missed visits documented with follow-up
+24.	Visit frequencies align to POC (variance documented)
+F) Discharge / Death / Bereavement (v1-lite)
+25.	Discharge reason documented (live discharge or transfer)
+26.	Death documentation elements present
+27.	Bereavement risk assessment and plan present
+In v1, focus scoring + deficiencies on the “survey-cite magnets”: election/CTI/recert/F2F/POC/IDG/orders/signatures/timeliness.
+________________________________________
+Correction guidance (safe, non-fabricating)
+Every deficiency produces a “Correction Card” with:
+•	What is missing (specific fields)
+•	Where it should live (note/form type)
+•	Who should complete it (role)
+•	What is allowed (addendum vs late entry vs new note)
+•	Required attestations
+•	A prompt checklist clinicians must answer (to ensure truthfulness)
+•	Optional template wording with placeholders (no invented clinical facts)
+Example (pattern):
+•	Deficiency: Missing F2F attestation element
+•	Correction: “Add F2F addendum including: date/time of encounter, practitioner role, summary of clinical findings supporting continued eligibility, practitioner signature/date.”
+________________________________________
+UI pages (minimum set)
+1.	Audit Dashboard
+o	Filters: location, clinician, date range, framework (CMS/CHAP/HHSC overlay)
+2.	Create Audit
+o	Selection: patient/episode, audit type, frameworks, date range
+3.	Chart Viewer
+o	Timeline + document list; highlighted evidence snippets
+4.	Findings
+o	Deficiency cards with severity, mapping, evidence, “Create correction task”
+5.	Correction Tasks
+o	Assigned to roles; status, comments, attestation checkbox
+6.	Reports
+o	Survey-ready PDF + CAPA + trends
+7.	Admin
+o	Framework versions, rule packs, templates, roles, facilities
+________________________________________
+Technical architecture (pragmatic)
+Services
+•	Ingestion: file upload + EMR export intake
+•	Document classifier: identify CTI, election, F2F, IDG, POC, visit notes
+•	Evidence extractor: dates, signatures, clinician role, key fields
+•	Rules engine: CRL checks + timing logic
+•	Recommendation engine: correction cards + tasks
+•	Reporting
+Data model (core tables)
+•	Patients, Episodes
+•	Artifacts (docs/notes/orders)
+•	ExtractedFields (field, value, date, source_artifact, confidence)
+•	Audits (frameworks, versions, run metadata)
+•	Findings (requirement_id, severity, status, evidence_refs)
+•	Tasks (assignee_role, due_date, attestation, resolution notes)
+•	FrameworkVersions + RulePacks
+Texas-first consideration
+•	Support multi-location/facility relationships early (Texas agencies often span facilities).
+•	HHSC overlay tagging in findings for “state survey readiness” reporting.
+________________________________________
+Build sequence (what engineering does first)
+Sprint 1–2
+•	Upload + artifact storage + basic classification
+•	Create Audit flow + run audit job
+•	Implement 10–12 rules: election, CTI, recert, F2F timing, POC, IDG cadence, order signatures
+Sprint 3–4
+•	Evidence linking UI (timeline + deficiency cards)
+•	Correction tasks + assignments
+•	PDF report export
+Sprint 5+
+•	Expand rule library to 25–40
+•	Consistency checks (decline narrative vs notes)
+•	HHSC overlay expansion + trend dashboard
+________________________________________
+What I recommend you decide now (no long back-and-forth)
+1.	EMR reality: Are you integrating with a specific hospice EMR first, or starting with “upload PDFs + CSV export”?
+2.	Audit target: Are you aiming for admission + recert audits first (highest ROI), or “full chart survey readiness”?
+If you reply with “PDF-first” or “EMR X first” and your preferred initial audit type, I’ll generate a full PRD + a 40-check CRL starter matrix (CMS+CHAP with HHSC overlay tags) in a format your team can paste into Jira/Confluence.
+

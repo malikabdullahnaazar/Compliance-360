@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ren *)",
+      "WebSearch",
+      "WebFetch(www.myhbconsulting.com)",
+      "WebFetch(www.nursemagic.ai)",
+      "WebFetch(www.cms.gov)",
+      "Bash(python *)"
+    ]
+  },
+  "$version": 3
+}

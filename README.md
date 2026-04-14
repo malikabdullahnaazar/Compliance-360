@@ -1,6 +1,6 @@
-# Compliance 360
+# CompliAI Chart
 
-Compliance 360 is a full-stack application designed to help organizations manage their compliance requirements efficiently.
+CompliAI Chart is a full-stack application designed to help organizations manage their compliance requirements efficiently.
 
 ## Project Structure
 

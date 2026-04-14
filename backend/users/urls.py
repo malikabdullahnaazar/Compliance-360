@@ -1,8 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-    AgencyListCreateView,
-    AgencyDetailView,
     CustomTokenObtainPairView,
     LogoutView,
     MeView,
@@ -11,6 +9,8 @@ from .views import (
     UserCreateView,
     UserDetailView,
     UserToggleStatusView,
+    ForgotPasswordView,
+    ResetPasswordView
 )
 
 urlpatterns = [
@@ -19,15 +19,15 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/me/', MeView.as_view(), name='users_me'),
     path('auth/register/', RegisterView.as_view(), name='auth_register'),
-    
-    # Agency endpoints
-    path('admin/agencies/', AgencyListCreateView.as_view(), name='admin_agencies'),
-    path('admin/agencies/<int:pk>/', AgencyDetailView.as_view(), name='admin_agency_detail'),
-    
+
     # User endpoints
     path('admin/users/', UserListView.as_view(), name='admin_users_list'),
     path('admin/users/create/', UserCreateView.as_view(), name='admin_users_create'),
     path('admin/users/<int:pk>/', UserDetailView.as_view(), name='admin_user_detail'),
     path('admin/users/<int:pk>/toggle-status/', UserToggleStatusView.as_view(), name='admin_user_toggle_status'),
+
+    # Password Reset endpoints
+    path('auth/forgot-password/', ForgotPasswordView.as_view(), name='auth_forgot_password'),
+    path('auth/reset-password/', ResetPasswordView.as_view(), name='auth_reset_password'),
 ]
 

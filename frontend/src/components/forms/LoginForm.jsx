@@ -56,7 +56,20 @@ const LoginForm = () => {
         placeholder="••••••••"
         onChange={(event) => setPassword(event.target.value)}
         required
+        wrapperClassName="mb-1"
       />
+      <div className="flex items-center justify-end mt-1 mb-4">
+        <a
+          href="/forgot-password"
+          className="text-sm font-medium text-teal-600 hover:text-teal-500 dark:text-teal-400 dark:hover:text-teal-300"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate('/forgot-password');
+          }}
+        >
+          Forgot password?
+        </a>
+      </div>
       {error && (
         <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
           <p className="font-medium">{error}</p>

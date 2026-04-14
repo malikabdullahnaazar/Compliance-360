@@ -1,6 +1,6 @@
-# Compliance 360 Backend
+# CompliAI Chart Backend
 
-This is the backend for the Compliance 360 application, built with Django.
+This is the backend for the CompliAI Chart application, built with Django.
 
 ## Prerequisites
 

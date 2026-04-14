@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import Agency, CustomUser
+from .models import CustomUser
 
 
 class UserSerializer(serializers.ModelSerializer):
     agency_name = serializers.SerializerMethodField()
-    password = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = CustomUser
@@ -15,6 +15,9 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
     def get_agency_name(self, obj):
+        # Superadmins don't belong to any agency
+        if obj.role == 'superadmin':
+            return None
         return obj.agency.name if obj.agency else None
 
     def create(self, validated_data):
@@ -50,10 +53,3 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', ''),
         )
         return user
-
-
-class AgencySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Agency
-        fields = ('id', 'name', 'slug', 'created_at')
-        read_only_fields = ('id', 'slug', 'created_at')

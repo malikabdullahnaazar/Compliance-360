@@ -10,11 +10,16 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env so all os.getenv() calls below work correctly
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -43,9 +48,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'django_filters',
     
     # Local apps
     'users',
+    'ai',
+    'patients',
+    'agencies',
 ]
 
 MIDDLEWARE = [
@@ -126,10 +135,20 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ── Large file upload support ────────────────────────────────────────────────
+# Allow files up to 100 MB in memory so hospice chart PDFs (often 20 MB+)
+# can be received by Django without a request-body size error.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600   # 100 MB in bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600   # 100 MB in bytes
 
 # Custom User Model
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -138,13 +157,20 @@ AUTH_USER_MODEL = 'users.CustomUser'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
 }
 
 # Simple JWT Configuration
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=2),
 }
 
 # CORS Configuration
@@ -152,3 +178,27 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# ── AI / Model Configuration ─────────────────────────────────────────────────
+# APP_ENV=Dev  → use Mistral AI (free / low cost, for development)
+# APP_ENV=Prod → use OpenAI GPT-4o / GPT-4o-mini (production)
+APP_ENV = os.getenv('APP_ENV', 'Dev')   # default to Dev if not set
+
+AI_SETTINGS = {
+    'APP_ENV': APP_ENV,
+    # OpenAI (Prod)
+    'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY', ''),
+    'OPENAI_MODEL': os.getenv('OPENAI_MODEL', 'gpt-4o'),           # full analysis
+    'OPENAI_MINI_MODEL': os.getenv('OPENAI_MINI_MODEL', 'gpt-4o-mini'),  # lightweight tasks
+    'OPENAI_MAX_TOKENS': int(os.getenv('OPENAI_MAX_TOKENS', '16000')),
+    'OPENAI_TEMPERATURE': float(os.getenv('OPENAI_TEMPERATURE', '0.1')),
+    'OPENAI_FILE_SIZE_LIMIT_MB': float(os.getenv('OPENAI_FILE_SIZE_LIMIT_MB', '20')),
+    # Mistral (Dev)
+    'MISTRAL_AI_KEY': os.getenv('MISTRAL_AI_KEY', ''),
+    'MISTRAL_MODEL': os.getenv('MISTRAL_MODEL', 'open-mistral-nemo'),
+    # Shared
+    'MAX_DOCUMENT_SIZE_MB': int(os.getenv('AI_MAX_DOCUMENT_SIZE_MB', '0')),  # 0 = no limit
+    'OCR_ENABLED': os.getenv('AI_OCR_ENABLED', 'true').lower() == 'true',
+    'DEFAULT_FRAMEWORKS': os.getenv('DEFAULT_FRAMEWORKS', 'CMS,CHAP').split(','),
+    'ENABLE_TEXAS_HHSC': os.getenv('ENABLE_TEXAS_HHSC', 'true').lower() == 'true',
+}

@@ -1,0 +1,164 @@
+1. Product Requirements Document (PRD)
+Hospice Chart Audit Platform
+Scope: Admission + Recertification
+Frameworks: CMS + CHAP (HHSC overlay, Texas-first)
+________________________________________
+Objective
+Enable hospice agencies to proactively identify and correct admission and recertification documentation deficiencies aligned with CMS CoPs, CHAP standards, and Texas HHSC expectations—before survey.
+________________________________________
+In-Scope (MVP)
+Audit Types
+•	Admission Audit
+•	Recertification Audit (90-day, 60-day, subsequent periods)
+Frameworks
+•	CMS Hospice CoPs
+•	CHAP Hospice Standards
+•	HHSC Hospice rules (overlay tags + reporting)
+Outputs
+•	Deficiency list with:
+o	Severity
+o	Framework citations
+o	Evidence links
+•	Correction guidance (safe, non-fabricating)
+•	Survey-ready PDF + CAPA summary
+________________________________________
+Out of Scope (MVP)
+•	Routine visit audits
+•	Bereavement-only audits
+•	EMR write-back
+•	Auto-generated clinical narratives
+________________________________________
+User Roles
+•	QA/Compliance: runs audits, assigns corrections
+•	Clinical Leadership: reviews trends, signs off
+•	Clinicians: resolve assigned correction tasks
+________________________________________
+Success Metrics
+•	% of admission charts passing without critical deficiencies
+•	Reduction in repeat deficiencies at recert
+•	Time to audit completion
+•	Time to correction closure
+________________________________________
+2. Admission + Recert Common Requirements Library (CRL)
+Below are 40 high-risk, survey-relevant checks.
+Each check is one rule, mapped to CMS, CHAP, and HHSC.
+________________________________________
+A. Admission – Election & Eligibility (Checks 1–15)
+Election & Rights
+1.	Hospice election statement present
+2.	Election includes all required elements
+3.	Patient/representative signature present
+4.	Election effective date documented
+5.	Attending physician selection documented
+6.	Patient rights acknowledgment present
+7.	Notice of hospice election provided timely
+Certification of Terminal Illness (CTI)
+8.	Initial CTI present
+9.	CTI signed by appropriate physician
+10.	CTI dated timely relative to admission
+11.	Diagnosis on CTI matches medical record
+12.	Prognosis timeframe documented (≤ 6 months)
+Eligibility Support
+13.	Clinical narrative supports terminal prognosis
+14.	Supporting documentation present (LCD indicators / decline)
+15.	No contradictory documentation (e.g., “improving,” curative goals)
+________________________________________
+B. Admission – Assessments & Plan of Care (Checks 16–25)
+16.	Initial RN assessment completed timely
+17.	Comprehensive assessment completed within required timeframe
+18.	Pain assessment documented
+19.	Symptom assessment documented (dyspnea, anxiety, etc.)
+20.	Psychosocial assessment present
+21.	Spiritual assessment present or declined
+22.	Initial Plan of Care created
+23.	POC addresses assessed problems
+24.	POC includes measurable goals
+25.	Visit frequencies align with POC
+________________________________________
+C. Admission – Orders & Medications (Checks 26–30)
+26.	Admission orders present
+27.	Orders signed and dated appropriately
+28.	Verbal/telephone orders meet requirements
+29.	Medication profile present
+30.	Allergies documented
+________________________________________
+D. Recertification – Timing & F2F (Checks 31–36)
+31.	Recertification CTI present for period
+32.	Recert CTI signed by physician
+33.	Recert CTI completed timely
+34.	Face-to-Face encounter completed when required
+35.	F2F performed by eligible practitioner
+36.	F2F attestation present and complete
+________________________________________
+E. Recertification – Ongoing Eligibility (Checks 37–40)
+37.	Recert narrative supports continued decline
+38.	Decline indicators consistent across disciplines
+39.	IDG reviewed and documented recert decision
+40.	POC updated to reflect current status
+________________________________________
+HHSC Overlay (Texas)
+Each applicable finding gets tagged if it implicates:
+•	Patient rights
+•	Physician involvement
+•	Timeliness
+•	Documentation completeness
+This enables state survey–specific reporting without duplicating rules.
+________________________________________
+3. Audit Logic (How the system evaluates charts)
+Timing Engine
+•	Admission date = anchor
+•	Recert periods calculated automatically
+•	F2F windows enforced (days relative to benefit period)
+Evidence Matching
+•	Documents classified (CTI, election, F2F, POC, assessments)
+•	Key fields extracted:
+o	Dates
+o	Signatures
+o	Author role
+o	Diagnosis
+•	Conflicts flagged (e.g., decline vs improvement language)
+________________________________________
+Severity Model
+•	Critical: likely CMS/CHAP condition-level finding
+•	Major: standard-level deficiency
+•	Moderate: correctable but risky
+•	Minor: documentation cleanup
+•	Advisory: best practice
+________________________________________
+4. Correction Guidance Model (Key differentiator)
+Each failed check generates a Correction Card:
+Correction Card Includes:
+•	What is missing or noncompliant
+•	Why it matters (survey risk)
+•	Applicable CMS / CHAP / HHSC reference
+•	Who must correct it (RN, MD, IDG, etc.)
+•	Where correction belongs
+•	Allowed correction method:
+o	Addendum
+o	Late entry
+o	New documentation
+•	Required attestations
+•	Prompted questions (to prevent fabrication)
+⚠️ The system never invents clinical facts — it guides staff on what must be clarified or documented.
+________________________________________
+5. What to build first (engineering order)
+Phase 1 (Admission + Recert Core)
+•	Chart upload (PDF-first is fine)
+•	Document classification
+•	15 admission + 10 recert rules
+•	Deficiency UI
+•	PDF audit report
+Phase 2
+•	Full 40-rule set
+•	Correction task workflow
+•	HHSC-tagged reporting
+•	Trend dashboard (repeat deficiencies)
+________________________________________
+Strategic note (why this will sell)
+Texas agencies:
+•	Are terrified of eligibility and F2F
+•	Get cited repeatedly for timeliness and incomplete narratives
+•	Need proof-ready audits, not generic checklists
+This design directly answers that pain.
+________________________________________
+
