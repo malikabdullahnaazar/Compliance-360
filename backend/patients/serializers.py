@@ -58,16 +58,35 @@ class PatientCreateSerializer(serializers.ModelSerializer):
             'status'
         ]
         extra_kwargs = {
-            # Optional fields - not required
-            'last_name': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'emergency_contact_name': {'required': False, 'allow_blank': True},
-            'emergency_contact_phone': {'required': False, 'allow_blank': True},
-            'insurance_provider': {'required': False, 'allow_blank': True},
-            'policy_number': {'required': False, 'allow_blank': True},
-            'referring_physician': {'required': False, 'allow_blank': True},
+            # Optional fields - not required (aligned with frontend validation)
+            'phone': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'email': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'address': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'city': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'state': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'zip_code': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'emergency_contact_name': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'emergency_contact_phone': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'insurance_provider': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'policy_number': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'referring_physician': {'required': False, 'allow_blank': True, 'allow_null': True},
             'admission_date': {'required': False, 'allow_null': True},
-            'status': {'required': False},  # Has default value
+            'status': {'required': False, 'allow_blank': True, 'allow_null': True},
         }
+
+    def run_validation(self, data=serializers.empty):
+        """Convert empty strings to None for optional fields."""
+        if data is not serializers.empty and isinstance(data, dict):
+            nullable_fields = [
+                'phone', 'email', 'address', 'city',
+                'state', 'zip_code', 'emergency_contact_name',
+                'emergency_contact_phone', 'insurance_provider',
+                'policy_number', 'referring_physician', 'admission_date', 'status'
+            ]
+            for field in nullable_fields:
+                if field in data and data[field] == '':
+                    data[field] = None
+        return super().run_validation(data)
 
 
 class PatientUpdateSerializer(serializers.ModelSerializer):
@@ -95,23 +114,36 @@ class PatientUpdateSerializer(serializers.ModelSerializer):
             'status'
         ]
         extra_kwargs = {
-            # Optional fields - not required on update
-            'last_name': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'emergency_contact_name': {'required': False, 'allow_blank': True},
-            'emergency_contact_phone': {'required': False, 'allow_blank': True},
-            'insurance_provider': {'required': False, 'allow_blank': True},
-            'policy_number': {'required': False, 'allow_blank': True},
-            'referring_physician': {'required': False, 'allow_blank': True},
-            'admission_date': {'required': False, 'allow_null': True},
-            'status': {'required': False},
-            # Required fields become optional on update (partial updates allowed)
+            # All fields optional on update (partial updates)
             'first_name': {'required': False},
+            'last_name': {'required': False},
             'date_of_birth': {'required': False},
             'gender': {'required': False},
-            'phone': {'required': False},
-            'email': {'required': False},
-            'address': {'required': False},
-            'city': {'required': False},
-            'state': {'required': False},
-            'zip_code': {'required': False},
+            'phone': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'email': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'address': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'city': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'state': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'zip_code': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'emergency_contact_name': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'emergency_contact_phone': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'insurance_provider': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'policy_number': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'referring_physician': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'admission_date': {'required': False, 'allow_null': True},
+            'status': {'required': False, 'allow_blank': True, 'allow_null': True},
         }
+
+    def run_validation(self, data=serializers.empty):
+        """Convert empty strings to None for optional fields."""
+        if data is not serializers.empty and isinstance(data, dict):
+            nullable_fields = [
+                'phone', 'email', 'address', 'city',
+                'state', 'zip_code', 'emergency_contact_name',
+                'emergency_contact_phone', 'insurance_provider',
+                'policy_number', 'referring_physician', 'admission_date', 'status'
+            ]
+            for field in nullable_fields:
+                if field in data and data[field] == '':
+                    data[field] = None
+        return super().run_validation(data)

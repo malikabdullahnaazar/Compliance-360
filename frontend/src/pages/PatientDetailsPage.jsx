@@ -109,9 +109,6 @@ const PatientDetailPage = () => {
         if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
         if (!formData.dob) newErrors.dob = 'Date of birth is required';
         if (!formData.gender) newErrors.gender = 'Gender is required';
-        if (!formData.address.trim()) newErrors.address = 'Street address is required';
-        if (!formData.city.trim()) newErrors.city = 'City is required';
-        if (!formData.status) newErrors.status = 'Status is required';
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -368,7 +365,7 @@ const PatientDetailPage = () => {
 
                                         <div>
                                             <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Street Address <span className="required-asterisk">*</span>
+                                                Street Address
                                             </label>
                                             <div className="relative">
                                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -391,7 +388,7 @@ const PatientDetailPage = () => {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    City <span className="required-asterisk">*</span>
+                                                    City
                                                 </label>
                                                 <input
                                                     type="text"
@@ -440,7 +437,7 @@ const PatientDetailPage = () => {
 
                                             <div>
                                                 <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Status <span className="required-asterisk">*</span>
+                                                    Status
                                                 </label>
                                                 <select
                                                     id="status"
