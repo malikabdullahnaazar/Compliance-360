@@ -261,64 +261,62 @@ For each finding:
 
 You must return a structured JSON response with the following format. Do not include any text outside the JSON block.
 
+**TOKEN SAVING RULE:** To avoid hitting response limits, only include findings with status "FAIL" in the `findings` array. You do NOT need to list "PASS" or "NOT_APPLICABLE" items unless they are critical for context. This ensures the output remains within the 16k token limit.
+
 ```json
 {
   "audit_summary": {
     "total_documents_analyzed": int,
     "overall_compliance_score": float (0-100),
     "risk_level": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-    "summary_text": "string (executive summary of key findings and survey readiness)"
+    "summary_text": "string (executive summary of key findings and survey readiness)",
+    "checks_passed": int,
+    "checks_failed": int
   },
   "findings": [
     {
       "check_number": int (1-87),
       "category": "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K",
       "severity": "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "ADVISORY",
-      "status": "PASS" | "FAIL" | "NOT_APPLICABLE",
+      "status": "FAIL", 
       "document_type": "string",
       "finding_title": "string (brief, clear summary)",
       "finding_description": "string (detailed explanation: what is missing/non-compliant, why it matters, regulatory context, and specific evidence from documents)",
       "regulatory_citations": [
         {
           "framework": "CMS|CHAP|HHSC",
-          "citation": "string (e.g., §418.22, 42 CFR 418.56, 26 TAC §266.221)",
-          "description": "string (regulatory text or summary of what the regulation requires)"
+          "citation": "string (e.g., §418.22)",
+          "description": "string (brief summary of regulation)"
         }
       ],
       "evidence_from_document": "string (EXACT quote from document that triggered finding, or 'Not found in documentation')",
-      "location_in_document": {
-        "page_number": int or null,
-        "section": "string or null"
-      },
       "correction_guidance": {
-        "what_is_missing": "string (specific data elements or documentation required)",
-        "where_it_belongs": "string (note type, form, or document where this should be documented)",
+        "what_is_missing": "string",
+        "where_it_belongs": "string",
         "who_must_complete": "RN|PHYSICIAN|MEDICAL_DIRECTOR|SOCIAL_WORKER|CHAPLAIN|AIDE|THERAPIST|IDG|ADMIN|QA",
         "allowed_correction_method": "addendum|late_entry|new_note|signature_only|clarification",
-        "required_attestations": "string (what signature/date/attestation language is needed)",
-        "template_suggestion": "string (suggested structure or placeholder language for the correction - NO fabricated clinical facts)"
+        "template_suggestion": "string"
       }
     }
   ],
   "red_flags": [
     {
-      "flag_type": "string (e.g., CONTRADICTORY_NOTES, MISSING_CTI_NARRATIVE, F2F_TIMING_VIOLATION, CLONED_DOCUMENTATION)",
-      "description": "string (detailed explanation of the red flag and why it's high-risk)",
+      "flag_type": "string",
+      "description": "string",
       "priority": "IMMEDIATE" | "URGENT" | "ROUTINE"
     }
   ],
   "recommendations": [
     {
-      "priority": int (1=highest),
-      "recommendation": "string (actionable recommendation to improve compliance)",
-      "expected_outcome": "string (what improvement this will achieve)"
+      "priority": int,
+      "recommendation": "string",
+      "expected_outcome": "string"
     }
   ],
   "metadata": {
     "audit_timestamp": "ISO 8601 timestamp",
     "ai_confidence_score": float (0-1),
-    "frameworks_applied": ["CMS", "CHAP", "HHSC (if enabled)"],
-    "notes": "string (any important notes about limitations, assumptions, or areas requiring human review)"
+    "frameworks_applied": ["CMS", "CHAP", "HHSC"]
   }
 }
 ```
@@ -327,12 +325,9 @@ You must return a structured JSON response with the following format. Do not inc
 
 ## FINAL INSTRUCTIONS
 
-1. Analyze ALL documents thoroughly against ALL 87 checks above.
-2. For each FAIL finding, provide specific evidence (exact quotes) and actionable correction guidance.
-3. For PASS findings, briefly state what was found that satisfies the requirement.
-4. For NOT_APPLICABLE findings, explain why the check does not apply to this patient/episode.
-5. Prioritize survey-risk items: Election, CTI, F2F, POC, IDG, Orders, and Timeliness issues.
-6. Be specific, accurate, and helpful. The goal is to make this agency survey-ready.
-
-Return ONLY valid JSON. No markdown, no explanations outside the JSON block.
+1. Analyze ALL documents thoroughly against ALL 87 checks.
+2. ONLY include "FAIL" findings in the `findings` array to stay within token limits.
+3. Keep descriptions and guidance concise yet actionable.
+4. If there are NO failures, ensure `audit_summary` reflects the pass but return an empty `findings` array.
+5. Return ONLY valid JSON. Do not include markdown or explanations outside the JSON block.
 """

@@ -22,12 +22,16 @@ class LangChainComplianceService:
     """
 
     def __init__(self):
-        self.provider = os.getenv("AI_PROVIDER", "openai").lower()
+        # Support both AI_PROVIDER and USE_MODEL for backward compatibility
+        self.provider = (os.getenv("AI_PROVIDER") or os.getenv("USE_MODEL", "openai")).lower()
         self.temperature = float(os.getenv("GOOGLE_TEMPERATURE" if self.provider == "google" else "OPENAI_TEMPERATURE", "0.1"))
-        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "16000"))
+        
+        # Increase default to 32k. Note: OpenAI gpt-4o-2024-08-06 supports up to 16,384 output tokens.
+        # However, Gemini supports much more. We'll set a higher default and cap it for OpenAI specifically.
+        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "32000"))
 
         self.model = self._setup_model()
-        logger.info(f"LangChainComplianceService initialized with provider: {self.provider}")
+        logger.info(f"LangChainComplianceService initialized with provider: {self.provider} | Max Tokens: {self.max_tokens}")
 
     def _setup_model(self):
         """Initialize the appropriate LangChain chat model based on environment config."""
@@ -42,7 +46,7 @@ class LangChainComplianceService:
                 model=model_name,
                 google_api_key=api_key,
                 temperature=self.temperature,
-                max_output_tokens=None,
+                max_output_tokens=self.max_tokens, # Use the increased limit
             )
         else:
             api_key = os.getenv("OPENAI_API_KEY")
@@ -50,12 +54,16 @@ class LangChainComplianceService:
             if not api_key:
                 raise ValueError("OPENAI_API_KEY is not set in .env")
             
-            logger.info(f"Setting up OpenAI model: {model_name}")
+            # OpenAI gpt-4o currently caps output at 4k or 16k depending on version.
+            # We cap our request to 16k to avoid "limit too high" errors while maximizing output.
+            openai_limit = min(self.max_tokens, 16384)
+            
+            logger.info(f"Setting up OpenAI model: {model_name} with max_tokens: {openai_limit}")
             return ChatOpenAI(
                 model=model_name,
                 api_key=api_key,
                 temperature=self.temperature,
-                max_tokens=self.max_tokens,
+                max_tokens=openai_limit,
                 model_kwargs={"response_format": {"type": "json_object"}}
             )
 

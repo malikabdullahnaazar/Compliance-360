@@ -368,7 +368,7 @@ const AnalyzingOverlay = () => (
             <div className="text-center">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">Analyzing Documents…</h3>
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Mistral AI is reviewing the selected patient documents for compliance issues.
+                    CompliAI is reviewing the selected patient documents for compliance issues.
                     <br />
                     This may take a minute. Please wait.
                 </p>
@@ -1119,27 +1119,27 @@ const AiAnalyzerPage = () => {
                                                     ))}
                                                 </div>
                                                 {resultsHasMore && (
-                                                <div className="flex justify-center pt-4">
-                                                    <button
-                                                        type="button"
-                                                        onClick={loadMoreResults}
-                                                        disabled={resultsLoadingMore}
-                                                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium
+                                                    <div className="flex justify-center pt-4">
+                                                        <button
+                                                            type="button"
+                                                            onClick={loadMoreResults}
+                                                            disabled={resultsLoadingMore}
+                                                            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium
                                                                 text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20
                                                                 hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors
                                                                 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        {resultsLoadingMore ? (
-                                                            <>
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                                Loading more...
-                                                            </>
-                                                        ) : (
-                                                            'See More'
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            )}
+                                                        >
+                                                            {resultsLoadingMore ? (
+                                                                <>
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    Loading more...
+                                                                </>
+                                                            ) : (
+                                                                'See More'
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </div>
