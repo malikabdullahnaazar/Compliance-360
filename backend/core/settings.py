@@ -18,8 +18,10 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env so all os.getenv() calls below work correctly
 load_dotenv(BASE_DIR / '.env')
+
+# Environment setting (Dev or Prod)
+APP_ENV = os.getenv('APP_ENV', 'Dev')
 
 
 # Quick-start development settings - unsuitable for production
@@ -95,27 +97,26 @@ ASGI_APPLICATION = 'core.asgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Production PostgreSQL Database
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
-        'NAME': os.getenv('DB_NAME', 'compliance360'),
-        'USER': os.getenv('DB_USER', 'compliance_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'CompliancePass2024!'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        'OPTIONS': {
-            'connect_timeout': 10,
-        },
-    }
-}
-
-# Fallback to SQLite for development if PostgreSQL is not configured
-if not os.getenv('DB_ENGINE') and DEBUG:
+if APP_ENV == 'Dev':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    # Production PostgreSQL Database
+    DATABASES = {
+        'default': {
+            'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
+            'NAME': os.getenv('DB_NAME', 'compliance360'),
+            'USER': os.getenv('DB_USER', 'compliance_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'CompliancePass2024!'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
         }
     }
 
@@ -223,10 +224,7 @@ if not DEBUG:
         CORS_ALLOWED_ORIGINS = [host.strip() for host in cors_hosts.split(',') if host.strip()]
 
 # ── AI / Model Configuration ─────────────────────────────────────────────────
-# APP_ENV=Dev  → use Mistral AI (free / low cost, for development)
-# APP_ENV=Prod → use OpenAI GPT-4o / GPT-4o-mini (production)
-APP_ENV = os.getenv('APP_ENV', 'Dev')   # default to Dev if not set
-
+# Current configuration uses provider specified in USE_MODEL (default: openai)
 AI_SETTINGS = {
     'APP_ENV': APP_ENV,
     # OpenAI (Prod)

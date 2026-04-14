@@ -31,7 +31,7 @@ class AIAuditAPIView(viewsets.ViewSet):
             ai_service = get_compliance_service()
             result = ai_service.analyze_documents(
                 documents=data['documents'],
-                patient_id=data.get('patient_id')
+                patient_info={'patient_id': data.get('patient_id')} if data.get('patient_id') else None
             )
             return Response(result, status=status.HTTP_200_OK)
             
@@ -52,10 +52,10 @@ class AIAuditAPIView(viewsets.ViewSet):
             result = ai_service.analyze_documents(
                 documents=[{
                     'content': data['document_content'],
-                    'type': data['document_type'],
+                    'document_type': data['document_type'],
                     'filename': 'single_document.txt'
                 }],
-                patient_id=data.get('patient_id')
+                patient_info={'patient_id': data.get('patient_id')} if data.get('patient_id') else None
             )
             return Response(result, status=status.HTTP_200_OK)
             
@@ -85,7 +85,7 @@ class AIAuditAPIView(viewsets.ViewSet):
             result = ai_service.analyze_documents(
                 documents=[{
                     'content': processed['content'],
-                    'type': document_type,
+                    'document_type': document_type,
                     'filename': uploaded_file.name
                 }]
             )

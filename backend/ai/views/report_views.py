@@ -21,12 +21,6 @@ class ReportAnalyzeView(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='analyze')
     def analyze(self, request):
         """Generates a Markdown compliance report for selected documents."""
-        # #region agent log - Debug entry
-        import json, time as _time, uuid
-        _req_id = str(uuid.uuid4())[:8]
-        _debug_entry = {'sessionId':'51f912','id':f'view_entry_{_req_id}','timestamp':int(_time.time()*1000),'location':'report_views.py:24','message':'VIEW: analyze endpoint entered','data':{'patient_id':request.data.get('patient_id'),'document_ids':request.data.get('document_ids',[]),'user':str(request.user),'request_id':_req_id,'path':request.path},'runId':'debug','hypothesisId':'B'}
-        with open('/root/.cursor/debug-51f912.log','a') as f: f.write(json.dumps(_debug_entry)+'\n')
-        # #endregion
         from patients.models import Patient
 
         patient_id = request.data.get('patient_id')
@@ -127,10 +121,6 @@ class ReportAnalyzeView(viewsets.ViewSet):
             
             report_markdown = "\n".join(report_md_lines)
             
-            # #region agent log - Debug markdown built
-            _debug_md = {'sessionId':'51f912','id':f'md_{_req_id}','timestamp':int(_time.time()*1000),'location':'report_views.py:131','message':'VIEW: markdown built','data':{'request_id':_req_id,'markdown_length':len(report_markdown)},'runId':'debug','hypothesisId':'E'}
-            with open('/root/.cursor/debug-51f912.log','a') as f: f.write(json.dumps(_debug_md)+'\n')
-            # #endregion
             
             # Post-process: make document names clickable links.
             for doc in documents_qs:
@@ -142,10 +132,6 @@ class ReportAnalyzeView(viewsets.ViewSet):
                     report_markdown,
                 )
             
-            # #region agent log - Debug response
-            _debug_resp = {'sessionId':'51f912','id':f'resp_{_req_id}','timestamp':int(_time.time()*1000),'location':'report_views.py:143','message':'VIEW: about to return Response','data':{'request_id':_req_id,'patient_id':patient_id,'findings_count':len(findings),'final_markdown_length':len(report_markdown)},'runId':'debug','hypothesisId':'E'}
-            with open('/root/.cursor/debug-51f912.log','a') as f: f.write(json.dumps(_debug_resp)+'\n')
-            # #endregion
             
             response = Response({
                 'report_markdown': report_markdown,
@@ -155,19 +141,10 @@ class ReportAnalyzeView(viewsets.ViewSet):
                 'ai_model_used': result.get('metadata', {}).get('model')
             }, status=status.HTTP_200_OK)
             
-            # #region agent log - Debug response created
-            _debug_ret = {'sessionId':'51f912','id':f'ret_{_req_id}','timestamp':int(_time.time()*1000),'location':'report_views.py:154','message':'VIEW: Response object created','data':{'request_id':_req_id,'status':response.status_code,'response_size':len(str(response.data))},'runId':'debug','hypothesisId':'E'}
-            with open('/root/.cursor/debug-51f912.log','a') as f: f.write(json.dumps(_debug_ret)+'\n')
-            # #endregion
             
             return response
 
         except Exception as exc:
-            # #region agent log - Debug error
-            import traceback as _tb
-            _debug_err = {'sessionId':'51f912','id':f'err_{_req_id}','timestamp':int(_time.time()*1000),'location':'report_views.py:161','message':'VIEW: analyze exception caught','data':{'request_id':_req_id,'error':str(exc),'traceback':_tb.format_exc()[:500]},'runId':'debug','hypothesisId':'E'}
-            with open('/root/.cursor/debug-51f912.log','a') as f: f.write(json.dumps(_debug_err)+'\n')
-            # #endregion
             logger.error(f'AI analysis failed: {exc}')
             return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

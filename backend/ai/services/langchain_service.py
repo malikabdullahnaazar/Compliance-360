@@ -80,12 +80,6 @@ class LangChainComplianceService:
         regulations to analyze documents against all 63 red flag checks defined in the
         system prompt.
         """
-        # #region agent log - Debug AI service call
-        import json, time as _time, os
-        _ai_call_id = f"ai_{int(_time.time()*1000)}"
-        _debug_ai = {'sessionId':'51f912','id':_ai_call_id,'timestamp':int(_time.time()*1000),'location':'langchain_service.py:70','message':'AI_SERVICE: analyze_documents called','data':{'patient_info':patient_info,'doc_count':len(documents),'pid':os.getpid()},'runId':'debug','hypothesisId':'B'}
-        with open('/root/.cursor/debug-51f912.log','a') as f: f.write(json.dumps(_debug_ai)+'\n')
-        # #endregion
         patient_name = f"{patient_info.get('first_name', '')} {patient_info.get('last_name', '')}".strip() or "Unknown"
         logger.info(f"Starting AI Analysis for Patient: {patient_name} | Documents: {len(documents)}")
 
