@@ -2,13 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-    Brain, FileText, X, Save, ChevronDown, AlertTriangle,
+    Brain, FileText, X, ChevronDown, AlertTriangle,
     Search, ChevronUp, Calendar, Cpu, FileStack, Users, ChevronLeft, ChevronRight, CheckCircle, XCircle,
     UserCheck, ClipboardList, Clock, FileCheck, ExternalLink, Loader2
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar from '../components/layout/Navbar';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
@@ -16,102 +13,21 @@ import Button from '../components/ui/Button';
 import { patientService } from '../services/patient.service';
 import { documentService } from '../services/document.service';
 import { addToast } from '../store/slices/uiSlice';
+import { registerJob } from '../store/slices/analysisJobsSlice';
 import api from '../services/api';
 
 /* ─── API helpers ─────────────────────────────────────────────────────────── */
-const analyzeDocuments = (patientId, documentIds) =>
-    api.post('/ai/mistral/analyze/', { patient_id: patientId, document_ids: documentIds });
-const saveResult = (payload) => api.post('/ai/mistral/save/', payload);
+const analyzeDocuments = (patientId, documentIds, model) =>
+    api.post('/ai/mistral/analyze/', {
+        patient_id: patientId,
+        document_ids: documentIds,
+        model,
+    });
 const fetchResults = (params = {}) =>
     api.get('/ai/mistral/results/', { params });
 const fetchClinicians = () => api.get('/ai/mistral/clinicians/');
 const assignReport = (payload) => api.post('/ai/mistral/assign/', payload);
 const markAsPass = (resultId) => api.post(`/ai/mistral/results/${resultId}/mark_as_pass/`);
-
-/* ─── Shared Markdown config ──────────────────────────────────────────────── */
-const MD_PLUGINS = [remarkGfm, remarkBreaks];
-
-// Custom renderers – make the report look premium inside prose
-const mdComponents = {
-    // Patient header block: bold key-value lines become a styled info row
-    strong: ({ children }) => (
-        <strong className="text-gray-900 dark:text-white font-semibold">{children}</strong>
-    ),
-    // Horizontal rules → divider
-    hr: () => <hr className="my-6 border-gray-200 dark:border-gray-700" />,
-    // Blockquotes → teal evidence card
-    blockquote: ({ children }) => (
-        <blockquote className="not-italic border-l-4 border-teal-400 bg-teal-50 dark:bg-teal-900/10
-      px-4 py-3 rounded-r-lg my-4 text-gray-700 dark:text-gray-300 text-sm">
-            {children}
-        </blockquote>
-    ),
-    // h1 → styled audit title
-    h1: ({ children }) => (
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-0 mb-4 pb-3
-      border-b-2 border-teal-200 dark:border-teal-800">
-            {children}
-        </h1>
-    ),
-    // h2 → section header
-    h2: ({ children }) => (
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-8 mb-3 pb-2
-      border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-            {children}
-        </h2>
-    ),
-    // h3 → finding title
-    h3: ({ children }) => (
-        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mt-6 mb-2">
-            {children}
-        </h3>
-    ),
-    // Paragraphs within the header section
-    p: ({ children }) => (
-        <p className="leading-relaxed text-sm text-gray-700 dark:text-gray-300 my-1">{children}</p>
-    ),
-    // List items
-    li: ({ children }) => (
-        <li className="text-sm text-gray-700 dark:text-gray-300 my-0.5">{children}</li>
-    ),
-    // Inline code
-    code: ({ children }) => (
-        <code className="text-teal-700 dark:text-teal-300 bg-teal-50
-      dark:bg-teal-900/20 px-1.5 py-0.5 rounded text-xs font-mono">
-            {children}
-        </code>
-    ),
-    // Tables
-    table: ({ children }) => (
-        <div className="overflow-x-auto my-4">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm border
-        border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                {children}
-            </table>
-        </div>
-    ),
-    thead: ({ children }) => (
-        <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>
-    ),
-    th: ({ children }) => (
-        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600
-      dark:text-gray-300 uppercase tracking-wider">
-            {children}
-        </th>
-    ),
-    td: ({ children }) => (
-        <td className="px-4 py-3 text-gray-700 dark:text-gray-300 border-t
-      border-gray-100 dark:border-gray-800">
-            {children}
-        </td>
-    ),
-    // Links (handling custom doc:id scheme)
-    a: ({ children }) => (
-        <span className="font-semibold text-gray-900 dark:text-white">
-            {children}
-        </span>
-    ),
-};
 
 /* ─── SearchablePatientSelect (backend-driven, paginated) ─────────────────── */
 /**
@@ -352,102 +268,6 @@ const SearchablePatientSelect = ({
     );
 };
 
-/* ─── Full-screen "Analyzing…" overlay ───────────────────────────────────── */
-const AnalyzingOverlay = () => (
-    /* z-[200] → always above the Navbar (z-50) */
-    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-gray-900/80 backdrop-blur-sm">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-10
-      flex flex-col items-center gap-6 max-w-sm w-full mx-4">
-            <div className="relative flex items-center justify-center">
-                <div className="absolute h-20 w-20 rounded-full border-4 border-teal-500/30 animate-ping" />
-                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-teal-400 to-indigo-500
-          flex items-center justify-center shadow-lg">
-                    <Brain className="h-8 w-8 text-white animate-pulse" />
-                </div>
-            </div>
-            <div className="text-center">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Analyzing Documents…</h3>
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    CompliAI is reviewing the selected patient documents for compliance issues.
-                    <br />
-                    This may take a minute. Please wait.
-                </p>
-            </div>
-            <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-teal-400 to-indigo-500
-          animate-pulse" style={{ width: '70%' }} />
-            </div>
-        </div>
-    </div>
-);
-
-/* ─── Result popup modal ──────────────────────────────────────────────────── */
-const ResultModal = ({ result, onClose }) => (
-    /*
-     * z-[200] → sits above Navbar (z-50).
-     * We do NOT use inset-0 for the content wrapper – instead we use
-     * flex + pt-16 so the dialog never slides behind the sticky header.
-     */
-    <div className="fixed inset-0 z-[200] flex flex-col">
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={onClose} />
-
-        {/* Dialog – centred but pushed below navbar height (64px / pt-16) */}
-        <div className="relative flex-1 flex items-center justify-center p-4 pt-20">
-            <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl
-        flex flex-col w-full max-w-5xl"
-                style={{ maxHeight: 'calc(100vh - 96px)' }}
-            >
-                {/* Modal header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b
-          border-gray-200 dark:border-gray-700 flex-shrink-0 rounded-t-2xl">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30
-              flex items-center justify-center">
-                            <Brain className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
-                                AI Compliance Audit Report
-                            </h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                Generated by Mistral · {result.ai_model}
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100
-              dark:hover:bg-gray-800 transition-colors"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
-
-                {/* Scrollable content */}
-                <div className="flex-1 overflow-y-auto px-6 py-6">
-                    <MarkdownReport markdown={result.report_markdown} />
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700
-          flex-shrink-0 flex justify-end gap-3 rounded-b-2xl">
-                    <Button variant="primary" onClick={onClose} className="px-6">Close</Button>
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
-/* ─── MarkdownReport – renders the AI output beautifully ─────────────────── */
-const MarkdownReport = ({ markdown }) => (
-    <div className="prose prose-sm prose-gray dark:prose-invert max-w-none">
-        <ReactMarkdown remarkPlugins={MD_PLUGINS} components={mdComponents}>
-            {markdown}
-        </ReactMarkdown>
-    </div>
-);
-
 /* ─── Main Page ───────────────────────────────────────────────────────────── */
 const AiAnalyzerPage = () => {
     const dispatch = useDispatch();
@@ -462,24 +282,19 @@ const AiAnalyzerPage = () => {
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
     const [loadingDocuments, setLoadingDocuments] = useState(false);
-    const [analyzing, setAnalyzing] = useState(false);
+    const [analyzeSubmitting, setAnalyzeSubmitting] = useState(false);
+    const [selectedModel, setSelectedModel] = useState('gpt-5.4');
 
     const [expandedResultPatient, setExpandedResultPatient] = useState(null);
 
-    /* Result popup */
-    const [pendingResult, setPendingResult] = useState(null);
-
     /* Results tab */
     const [resultPatient, setResultPatient] = useState('');
-    const [resultSearch, setResultSearch] = useState('');
     const [savedResults, setSavedResults] = useState([]);
     const [loadingResults, setLoadingResults] = useState(false);
-    const [expandedResult, setExpandedResult] = useState(null);
     // Results pagination (backend-driven)
     const [resultsPage, setResultsPage] = useState(1);
     const [resultsHasMore, setResultsHasMore] = useState(false);
     const [resultsLoadingMore, setResultsLoadingMore] = useState(false);
-    const [resultsNextUrl, setResultsNextUrl] = useState(null);
 
     /* Assign modal */
     const [clinicians, setClinicians] = useState([]);
@@ -515,7 +330,6 @@ const AiAnalyzerPage = () => {
             setSavedResults([]);
             setResultsPage(1);
             setResultsHasMore(false);
-            setResultsNextUrl(null);
             loadSavedResults(1, false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -527,7 +341,6 @@ const AiAnalyzerPage = () => {
             setSavedResults([]);
             setResultsPage(1);
             setResultsHasMore(false);
-            setResultsNextUrl(null);
             loadSavedResults(1, false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -554,7 +367,6 @@ const AiAnalyzerPage = () => {
         try {
             const params = { page, page_size: 10 };
             if (resultPatient) params.patient_id = resultPatient;
-            if (resultSearch) params.search = resultSearch;
             // Pass status filter based on active tab
             if (activeTab === 'passed') {
                 params.status = 'Pass';
@@ -572,7 +384,6 @@ const AiAnalyzerPage = () => {
                 setSavedResults(data);
             }
             setResultsHasMore(nextUrl !== null && nextUrl !== undefined);
-            setResultsNextUrl(nextUrl);
             setResultsPage(page);
         } catch {
             dispatch(addToast({ type: 'error', message: 'Failed to load saved results' }));
@@ -670,92 +481,40 @@ const AiAnalyzerPage = () => {
     const handleAnalyze = async () => {
         if (!selectedPatient) return dispatch(addToast({ type: 'error', message: 'Select a patient first' }));
         if (selectedDocuments.length === 0) return dispatch(addToast({ type: 'error', message: 'Select at least one document' }));
-        setAnalyzing(true);
+        setAnalyzeSubmitting(true);
         try {
-            const res = await analyzeDocuments(selectedPatient, selectedDocuments);
-            const { report_markdown, patient_info, document_names } = res.data;
-
-            // ── Determine Pass/Fail status ──────────────────────────────
-            // Strategy: parse actual numbers from the AI report rather than
-            // keyword-matching (headings like "Red Flags" always appear even
-            // when there are 0 findings, making keyword matching unreliable).
-
-            let status = 'Fail'; // default
-
-            // 1. Parse "Total Findings: N" from the Executive Summary line
-            //    Matches: "Total Findings: 0 | Critical: 0 | ..." (and ignores asterisks)
-            const findingsMatch = report_markdown.match(
-                /Total\s+Findings\D*(\d+)/i
-            );
-            if (findingsMatch) {
-                const totalFindings = parseInt(findingsMatch[1], 10);
-                status = totalFindings === 0 ? 'Pass' : 'Fail';
-            } else {
-                // 2. Parse Compliance Score: X/100 — ≥ 85 = Pass
-                const scoreMatch = report_markdown.match(
-                    /Compliance\s+Score\s*:\s*(\d+)\s*\/\s*100/i
+            const res = await analyzeDocuments(selectedPatient, selectedDocuments, selectedModel);
+            if (res.status === 202) {
+                const { job_id: jobId, message } = res.data;
+                dispatch(
+                    registerJob({
+                        jobId,
+                        patientId: selectedPatient,
+                        patientName: '',
+                        model: selectedModel,
+                    })
                 );
-                if (scoreMatch) {
-                    const score = parseInt(scoreMatch[1], 10);
-                    status = score >= 85 ? 'Pass' : 'Fail';
-                } else {
-                    // 3. Parse Overall Risk Level
-                    const riskMatch = report_markdown.match(
-                        /Overall\s+Risk\s+Level\s*:.*?(CRITICAL|HIGH|MEDIUM|LOW|NONE)/i
-                    );
-                    if (riskMatch) {
-                        const riskLevel = riskMatch[1].toUpperCase();
-                        status = (riskLevel === 'LOW' || riskLevel === 'NONE') ? 'Pass' : 'Fail';
-                    } else {
-                        // 4. Last resort: check only actual finding lines for FAIL/❌
-                        //    (not section headings which always contain "Red Flags")
-                        const failLinePattern = /^[-*]\s.*?(?:❌\s*FAIL|status:\s*❌)/im;
-                        status = failLinePattern.test(report_markdown) ? 'Fail' : 'Pass';
-                    }
-                }
+                dispatch(
+                    addToast({
+                        type: 'success',
+                        message:
+                            message ||
+                            'Analysis queued. Watch progress in the corner; your report will appear under Results or Passed.',
+                    })
+                );
+                return;
             }
-
-            // Auto save result
-            await saveResult({
-                patient_id: patient_info.patient_id,
-                report_markdown: report_markdown,
-                document_names: document_names,
-                ai_model_used: 'open-mistral-nemo',
-                status: status,
-            });
-
-            setPendingResult({
-                report_markdown,
-                ai_model: 'open-mistral-nemo',
-                patient_id: patient_info.patient_id,
-                document_names,
-                status,
-            });
-            dispatch(addToast({ type: 'success', message: 'Analysis completed and saved successfully!' }));
+            dispatch(addToast({ type: 'error', message: 'Unexpected response from analysis service.' }));
         } catch (err) {
             dispatch(addToast({ type: 'error', message: err?.response?.data?.error || 'AI analysis failed. Please try again.' }));
         } finally {
-            setAnalyzing(false);
+            setAnalyzeSubmitting(false);
         }
-    };
-
-    const handleResultPatientChange = (id) => {
-        setResultPatient(id);
-        setExpandedResultPatient(id ? true : false);
     };
 
     /* ────────────────────────────────────────────────────── */
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] dark:bg-gray-900 dark:text-gray-100">
-            {analyzing && <AnalyzingOverlay />}
-
-            {pendingResult && (
-                <ResultModal
-                    result={pendingResult}
-                    onClose={() => setPendingResult(null)}
-                />
-            )}
-
             <Sidebar
                 onToggle={setSidebarCollapsed}
                 isOpen={isMobileMenuOpen}
@@ -778,7 +537,7 @@ const AiAnalyzerPage = () => {
                                     AI Analyzer
                                 </h1>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    Analyze patient documents using Mistral AI to detect hospice compliance violations and red flags.
+                                    Analyze patient documents with AI (LangChain / OpenAI) to detect hospice compliance violations and red flags.
                                 </p>
                             </div>
 
@@ -809,15 +568,34 @@ const AiAnalyzerPage = () => {
                             {activeTab === 'analyze' && (
                                 <div className="space-y-6">
                                     {/* Searchable patient picker */}
-                                    <div className="max-w-md">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Select Patient
-                                        </label>
-                                        <SearchablePatientSelect
-                                            value={selectedPatient}
-                                            onChange={handleAnalyzePatientChange}
-                                            placeholder="Select a patient to analyze…"
-                                        />
+                                    <div className="max-w-md space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Select Patient
+                                            </label>
+                                            <SearchablePatientSelect
+                                                value={selectedPatient}
+                                                onChange={handleAnalyzePatientChange}
+                                                placeholder="Select a patient to analyze…"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label
+                                                htmlFor="ai-model-select"
+                                                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                                            >
+                                                AI model
+                                            </label>
+                                            <select
+                                                id="ai-model-select"
+                                                value={selectedModel}
+                                                onChange={(e) => setSelectedModel(e.target.value)}
+                                                className="w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                            >
+                                                <option value="gpt-5.4">GPT-5.4</option>
+                                                <option value="gpt-4o">GPT-4o</option>
+                                            </select>
+                                        </div>
                                     </div>
 
                                     {/* Documents table */}
@@ -908,12 +686,16 @@ const AiAnalyzerPage = () => {
                                         <div className="flex justify-end">
                                             <Button
                                                 onClick={handleAnalyze}
-                                                disabled={selectedDocuments.length === 0}
+                                                disabled={selectedDocuments.length === 0 || analyzeSubmitting}
                                                 variant="primary"
                                                 className="px-8 flex items-center gap-2 shadow-md"
                                             >
-                                                <Brain className="h-4 w-4" />
-                                                Analyze{selectedDocuments.length > 0 ? ` (${selectedDocuments.length} docs)` : ''}
+                                                {analyzeSubmitting ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                                ) : (
+                                                    <Brain className="h-4 w-4" aria-hidden="true" />
+                                                )}
+                                                {analyzeSubmitting ? 'Starting…' : `Analyze${selectedDocuments.length > 0 ? ` (${selectedDocuments.length} docs)` : ''}`}
                                             </Button>
                                         </div>
                                     )}
@@ -961,7 +743,7 @@ const AiAnalyzerPage = () => {
                                             <div className="space-y-6">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">
-                                                        <button onClick={() => { setExpandedResultPatient(false); setExpandedResult(null); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                                                        <button onClick={() => { setExpandedResultPatient(false); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
                                                             <ChevronLeft className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                                                         </button>
                                                         <div>

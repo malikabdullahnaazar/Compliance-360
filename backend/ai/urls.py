@@ -27,6 +27,11 @@ urlpatterns = [
     path('extract-analyze/', AIAuditAPIView.as_view({'post': 'extract_and_analyze'}), name='ai-extract-analyze'),
     # Mistral endpoints
     path('mistral/analyze/', MistralAnalyzeView.as_view({'post': 'analyze'}), name='mistral-analyze'),
+    path(
+        'mistral/jobs/<uuid:job_id>/status/',
+        MistralAnalyzeView.as_view({'get': 'job_status'}),
+        name='mistral-job-status',
+    ),
     path('mistral/save/', MistralAnalyzeView.as_view({'post': 'save_result'}), name='mistral-save'),
     path('mistral/results/', MistralAnalyzeView.as_view({'get': 'list_results'}), name='mistral-results'),
     path('mistral/results/<str:result_id>/detail/', MistralAnalyzeView.as_view({'get': 'get_result_detail'}), name='mistral-result-detail'),

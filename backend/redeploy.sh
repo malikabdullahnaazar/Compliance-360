@@ -38,6 +38,17 @@ if [ ! -d "venv" ]; then
     exit 1
 fi
 
+# Redis (Celery message broker)
+if ! dpkg -l redis-server 2>/dev/null | grep -q '^ii'; then
+    print_status "Installing Redis server..."
+    apt-get update -qq
+    apt-get install -y redis-server
+fi
+if ! systemctl is-active --quiet redis-server; then
+    print_status "Starting Redis..."
+    systemctl enable --now redis-server
+fi
+
 # Step 1: Activate virtual environment
 print_status "Activating virtual environment..."
 source venv/bin/activate
@@ -54,15 +65,23 @@ python manage.py migrate --noinput
 print_status "Collecting static files..."
 python manage.py collectstatic --noinput --clear 2>/dev/null || python manage.py collectstatic --noinput
 
-# Step 5: Restart application service
+# Step 5: Celery worker unit
+print_status "Installing Celery systemd unit..."
+install -m 644 deploy/systemd/compliance360-celery.service /etc/systemd/system/compliance360-celery.service
+systemctl daemon-reload
+systemctl enable compliance360-celery
+
+# Step 6: Restart application + Celery
 print_status "Restarting application service..."
 systemctl restart compliance360
+print_status "Restarting Celery worker..."
+systemctl restart compliance360-celery
 
-# Step 6: Wait for service to start
+# Step 7: Wait for service to start
 print_status "Waiting for service to start..."
 sleep 3
 
-# Step 7: Verify service is running
+# Step 8: Verify services
 if systemctl is-active --quiet compliance360; then
     print_status "✓ Compliance 360 service is running"
 else
@@ -71,7 +90,15 @@ else
     exit 1
 fi
 
-# Step 8: Test API endpoint
+if systemctl is-active --quiet compliance360-celery; then
+    print_status "✓ Celery worker (compliance360-celery) is running"
+else
+    print_error "✗ Celery worker failed to start — check: journalctl -u compliance360-celery -n 50 --no-pager"
+    journalctl -u compliance360-celery -n 20 --no-pager || true
+    exit 1
+fi
+
+# Step 9: Test API endpoint
 print_status "Testing API endpoint..."
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/admin/login/ || echo "000")
 if [ "$HTTP_STATUS" == "200" ] || [ "$HTTP_STATUS" == "302" ]; then
@@ -88,5 +115,6 @@ echo ""
 echo "Backend URL: http://187.124.209.234:8000/"
 echo "Admin Panel: http://187.124.209.234:8000/admin/"
 echo ""
-echo "View logs: journalctl -u compliance360 -f"
+echo "View API logs:    journalctl -u compliance360 -f"
+echo "View Celery logs: journalctl -u compliance360-celery -f"
 echo ""

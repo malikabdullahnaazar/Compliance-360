@@ -2,8 +2,9 @@ import os
 import json
 import logging
 import time
+from collections.abc import Callable
 from typing import List, Dict, Any, Optional
-from django.conf import settings
+
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -50,7 +51,7 @@ class LangChainComplianceService:
             )
         else:
             api_key = os.getenv("OPENAI_API_KEY")
-            model_name = os.getenv("OPENAI_MODEL", "gpt-4o")
+            model_name = os.getenv("OPENAI_MODEL", "gpt-5.4")
             if not api_key:
                 raise ValueError("OPENAI_API_KEY is not set in .env")
             
@@ -67,10 +68,26 @@ class LangChainComplianceService:
                 model_kwargs={"response_format": {"type": "json_object"}}
             )
 
+    def _openai_chat_for_model(self, model_name: str) -> ChatOpenAI:
+        """Build a ChatOpenAI instance for a single request (avoids mutating the singleton)."""
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is not set in .env")
+        openai_limit = min(self.max_tokens, 16384)
+        return ChatOpenAI(
+            model=model_name,
+            api_key=api_key,
+            temperature=self.temperature,
+            max_tokens=openai_limit,
+            model_kwargs={"response_format": {"type": "json_object"}},
+        )
+
     def analyze_documents(
         self,
         documents: List[Dict[str, Any]],
-        patient_info: Optional[Dict[str, Any]] = None
+        patient_info: Optional[Dict[str, Any]] = None,
+        openai_model: Optional[str] = None,
+        progress_callback: Optional[Callable[[int], None]] = None,
     ) -> Dict[str, Any]:
         """
         Main entry point for clinical document review.
@@ -91,6 +108,8 @@ class LangChainComplianceService:
         logger.info("Step 1/4: Preparing document context for AI...")
         user_content = self._prepare_user_content(documents, patient_info)
         logger.info(f"Context preparation complete. Total characters: {len(user_content)}")
+        if progress_callback:
+            progress_callback(25)
 
         # 2. Construct messages (system prompt includes all 63 red flag checks)
         logger.info("Step 2/4: Constructing message payload...")
@@ -100,21 +119,31 @@ class LangChainComplianceService:
         ]
 
         try:
-            # 3. Call AI Model
-            active_model = getattr(self.model, "model", getattr(self.model, "model_name", "unknown"))
-            logger.info(f"Step 3/4: Invoking AI model ({self.provider}: {active_model})...")
-            start_time = time.time() if 'time' in globals() else None
-
-            response = self.model.invoke(messages)
-
-            if start_time:
-                duration = time.time() - start_time
-                logger.info(f"AI response received in {duration:.2f}s")
+            # 3. Call AI Model (per-run OpenAI model when provider is openai)
+            if self.provider == "google":
+                invoke_model = self.model
+                active_model = getattr(
+                    self.model, "model", getattr(self.model, "model_name", "unknown")
+                )
             else:
-                logger.info("AI response received.")
+                resolved_name = (openai_model or os.getenv("OPENAI_MODEL", "gpt-5.4")).strip()
+                invoke_model = self._openai_chat_for_model(resolved_name)
+                active_model = resolved_name
+
+            logger.info(f"Step 3/4: Invoking AI model ({self.provider}: {active_model})...")
+            if progress_callback:
+                progress_callback(55)
+            start_time = time.time()
+
+            response = invoke_model.invoke(messages)
+
+            duration = time.time() - start_time
+            logger.info(f"AI response received in {duration:.2f}s")
 
             # 4. Parse JSON response
             logger.info("Step 4/4: Parsing AI response...")
+            if progress_callback:
+                progress_callback(75)
             content = response.content
             # Strip markdown code blocks if present
             if content.startswith("```json"):
@@ -130,8 +159,10 @@ class LangChainComplianceService:
             result["metadata"].update({
                 "provider": self.provider,
                 "model": active_model,
-                "total_docs": len(documents)
+                "total_docs": len(documents),
             })
+            if progress_callback:
+                progress_callback(85)
 
             risk = result.get('audit_summary', {}).get('risk_level', 'Unknown')
             findings_count = len(result.get('findings', []))

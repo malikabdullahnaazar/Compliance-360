@@ -11,8 +11,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -120,6 +121,34 @@ else:
         }
     }
 
+
+def _default_celery_broker_url() -> str:
+    """
+    Redis broker (recommended for production).
+    Dev uses logical DB 1; production uses DB 0. Override with REDIS_URL or CELERY_BROKER_URL.
+    """
+    if APP_ENV == "Dev":
+        return "redis://127.0.0.1:6379/1"
+    return "redis://127.0.0.1:6379/0"
+
+
+CELERY_BROKER_URL = (
+    os.getenv("REDIS_URL", "").strip()
+    or os.getenv("CELERY_BROKER_URL", "").strip()
+    or _default_celery_broker_url()
+)
+CELERY_TASK_DEFAULT_QUEUE = "celery"
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_TRACK_STARTED = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_WORKER_CANCEL_LONG_RUNNING_TASKS_ON_CONNECTION_LOSS = True
+
+_result_backend = os.getenv("CELERY_RESULT_BACKEND", "").strip()
+if _result_backend:
+    CELERY_RESULT_BACKEND = _result_backend
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -229,7 +258,7 @@ AI_SETTINGS = {
     'APP_ENV': APP_ENV,
     # OpenAI (Prod)
     'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY', ''),
-    'OPENAI_MODEL': os.getenv('OPENAI_MODEL', 'gpt-4o'),           # full analysis
+    'OPENAI_MODEL': os.getenv('OPENAI_MODEL', 'gpt-5.4'),           # full analysis
     'OPENAI_MINI_MODEL': os.getenv('OPENAI_MINI_MODEL', 'gpt-4o-mini'),  # lightweight tasks
     'OPENAI_MAX_TOKENS': int(os.getenv('OPENAI_MAX_TOKENS', '16000')),
     'OPENAI_TEMPERATURE': float(os.getenv('OPENAI_TEMPERATURE', '0.1')),

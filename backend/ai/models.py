@@ -440,6 +440,82 @@ class AIAnalysisResult(models.Model):
         return f"AI Analysis – {self.patient} – {self.created_at.date()}"
 
 
+class AnalysisJob(models.Model):
+    """
+    Tracks an async document analysis job (Celery) until an AIAnalysisResult exists.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="analysis_jobs",
+    )
+    agency = models.ForeignKey(
+        "agencies.Agency",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="analysis_jobs",
+    )
+    patient = models.ForeignKey(
+        "patients.Patient",
+        on_delete=models.CASCADE,
+        related_name="analysis_jobs",
+    )
+    document_ids = models.JSONField(
+        default=list,
+        help_text="List of AuditDocument UUID strings included in this job",
+    )
+    openai_model = models.CharField(max_length=100, blank=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True
+    )
+    progress = models.PositiveSmallIntegerField(default=0)
+    error_message = models.TextField(blank=True)
+    analysis_result = models.OneToOneField(
+        AIAnalysisResult,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="analysis_job",
+    )
+    report_status = models.CharField(
+        max_length=10,
+        choices=[("Pass", "Pass"), ("Fail", "Fail")],
+        blank=True,
+        help_text="Pass/Fail snapshot after completion for UI routing",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["agency"]),
+            models.Index(fields=["patient"]),
+            models.Index(fields=["created_by"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def __str__(self):
+        return f"AnalysisJob {self.id} ({self.status})"
+
+
 class AssignedAuditReport(models.Model):
     """
     Tracks an AI analysis result assigned by an agency admin to a clinician.

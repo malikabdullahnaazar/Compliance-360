@@ -1,13 +1,11 @@
 import logging
-import re
-from datetime import datetime
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from ..models import AuditDocument, AIAnalysisResult, AssignedAuditReport
-from ..services.langchain_service import get_compliance_service
+from ..models import AnalysisJob, AuditDocument, AIAnalysisResult, AssignedAuditReport
+from ..tasks import run_analysis_job
 
 logger = logging.getLogger(__name__)
 
@@ -20,133 +18,99 @@ class ReportAnalyzeView(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'], url_path='analyze')
     def analyze(self, request):
-        """Generates a Markdown compliance report for selected documents."""
+        """Queue async document analysis; returns immediately with job identifiers."""
         from patients.models import Patient
 
         patient_id = request.data.get('patient_id')
         document_ids = request.data.get('document_ids', [])
 
         if not patient_id or not document_ids:
-            return Response({'error': 'patient_id and document_ids are required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'patient_id and document_ids are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             patient = Patient.objects.get(id=patient_id)
             documents_qs = AuditDocument.objects.filter(id__in=document_ids, patient=patient)
-            
+
             if not documents_qs.exists():
-                return Response({'error': 'No matching documents found'}, status=status.HTTP_400_BAD_REQUEST)
-
-            patient_info = {'patient_id': str(patient.id), 'first_name': patient.first_name, 'last_name': patient.last_name}
-            documents_data = [
-                {
-                    'filename': doc.filename,
-                    'document_type': doc.document_type,
-                    'document_type_display': doc.get_document_type_display(),
-                    'extracted_text': doc.extracted_text or '[No text extracted]',
-                    'file_size_mb': float(doc.file_size_mb or 0),
-                } for doc in documents_qs
-            ]
-
-            service = get_compliance_service()
-            result = service.analyze_documents(documents=documents_data, patient_info=patient_info)
-            
-            # --- Build the Detailed Markdown Report (Frontend Compatibility) ---
-            summary = result.get('audit_summary', {})
-            score = summary.get('overall_compliance_score', 0)
-            risk = summary.get('risk_level', 'UNKNOWN')
-            text = summary.get('summary_text', 'No summary provided.')
-            
-            findings = result.get('findings', [])
-            f_summary = result.get('metadata', {}).get('findings_summary', {})
-            critical = f_summary.get('critical', 0)
-            high = f_summary.get('high', 0)
-            medium = f_summary.get('medium', 0)
-            low = f_summary.get('low', 0)
-            
-            report_md_lines = [
-                f"# Compliance Audit Report",
-                f"\n## Executive Summary",
-                f"**Compliance Score**: {score}/100",
-                f"**Total Findings**: {len(findings)} | **Critical**: {critical} | **High**: {high} | **Medium**: {medium} | **Low**: {low}",
-                f"**Overall Risk Level**: {risk}",
-                f"\n{text}",
-                f"\n## Compliance Findings",
-            ]
-            
-            if not findings:
-                report_md_lines.append("\n✅ No compliance findings identified in the analyzed documents.")
-            else:
-                for idx, f in enumerate(findings, 1):
-                    sev_emoji = "❌" if f.get('severity') in ['CRITICAL', 'HIGH'] else "⚠️"
-                    report_md_lines.extend([
-                        f"\n### {idx}. {f.get('finding_title', 'Finding')}",
-                        f"**Status**: {sev_emoji} {f.get('status', 'FAIL').upper()}",
-                        f"**Severity**: {f.get('severity', 'MEDIUM')}",
-                        f"**Category**: {f.get('category', 'D')} - {f.get('document_type', 'Unknown Document')}",
-                        f"\n**Description**: {f.get('finding_description', '')}",
-                        f"\n**Evidence**: ",
-                        f"> {f.get('evidence_from_document', 'No evidence provided.')}",
-                    ])
-                    
-                    loc = f.get('location_in_document', {})
-                    if loc:
-                        report_md_lines.append(f"\n**Location**: Page {loc.get('page_number', 'N/A')}, Section: {loc.get('section', 'N/A')}")
-                    
-                    citations = f.get('regulatory_citations', [])
-                    if citations:
-                        report_md_lines.append("\n**Regulatory Citations**:")
-                        for c in citations:
-                            report_md_lines.append(f"- **{c.get('framework', 'CMS')} {c.get('citation', '')}**: {c.get('description', '')}")
-                    
-                    guidance = f.get('correction_guidance', {})
-                    if guidance:
-                        report_md_lines.append("\n**Correction Guidance**:")
-                        report_md_lines.append(f"- **Action**: {guidance.get('immediate_action', '')}")
-                        report_md_lines.append(f"- **Responsible**: {guidance.get('responsible_party', '')} | **Timeline**: {guidance.get('timeline', '')}")
-            
-            # Add Red Flags
-            red_flags = result.get('red_flags', [])
-            if red_flags:
-                report_md_lines.append("\n## 🚩 Red Flags")
-                for rf in red_flags:
-                    report_md_lines.append(f"- **[{rf.get('priority', 'URGENT')}] {rf.get('flag_type', '')}**: {rf.get('description', '')}")
-            
-            # Add Recommendations
-            recs = result.get('recommendations', [])
-            if recs:
-                report_md_lines.append("\n## Recommendations")
-                for r in recs:
-                    report_md_lines.append(f"{r.get('priority', 1)}. **{r.get('recommendation', '')}**")
-                    report_md_lines.append(f"   *Expected Outcome*: {r.get('expected_outcome', '')}")
-            
-            report_markdown = "\n".join(report_md_lines)
-            
-            
-            # Post-process: make document names clickable links.
-            for doc in documents_qs:
-                escaped = re.escape(doc.filename)
-                link = f"[{doc.filename}](doc:{str(doc.id)})"
-                report_markdown = re.sub(
-                    rf'(?<!\[){escaped}(?!\])',
-                    link,
-                    report_markdown,
+                return Response(
+                    {'error': 'No matching documents found'},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            
-            
-            response = Response({
-                'report_markdown': report_markdown,
-                'patient_info': patient_info,
-                'document_names': [d['filename'] for d in documents_data],
-                'result_data': result,
-                'ai_model_used': result.get('metadata', {}).get('model')
-            }, status=status.HTTP_200_OK)
-            
-            
-            return response
 
+            allowed_models = {'gpt-5.4', 'gpt-4o'}
+            raw_model = request.data.get('model') or request.data.get('openai_model')
+            resolved_model = 'gpt-5.4'
+            if isinstance(raw_model, str) and raw_model.strip() in allowed_models:
+                resolved_model = raw_model.strip()
+
+            agency = getattr(request.user, 'agency', None)
+            job = AnalysisJob.objects.create(
+                created_by=request.user,
+                agency=agency,
+                patient=patient,
+                document_ids=[str(did) for did in document_ids],
+                openai_model=resolved_model,
+                status=AnalysisJob.STATUS_PENDING,
+                progress=0,
+            )
+            async_result = run_analysis_job.delay(str(job.id))
+            AnalysisJob.objects.filter(pk=job.pk).update(celery_task_id=async_result.id)
+
+            return Response(
+                {
+                    'job_id': str(job.id),
+                    'task_id': async_result.id,
+                    'status': 'accepted',
+                    'message': (
+                        'Analysis has been queued. You can keep using the dashboard; '
+                        'when it finishes, the report appears under Results or Passed. '
+                        'Use the status URL for progress.'
+                    ),
+                    'status_url': f'/ai/mistral/jobs/{job.id}/status/',
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        except Patient.DoesNotExist:
+            return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:
-            logger.error(f'AI analysis failed: {exc}')
+            logger.error('Queue analysis failed: %s', exc)
             return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def job_status(self, request, job_id=None):
+        """GET /api/ai/mistral/jobs/<job_id>/status/"""
+        user = request.user
+        try:
+            job = AnalysisJob.objects.select_related('analysis_result').get(pk=job_id)
+        except AnalysisJob.DoesNotExist:
+            return Response({'error': 'Job not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if getattr(user, 'role', None) != 'superadmin':
+            if job.created_by_id != user.id:
+                return Response(
+                    {'error': 'You do not have permission to view this job.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if user.agency_id and job.agency_id and job.agency_id != user.agency_id:
+                return Response(
+                    {'error': 'You do not have permission to view this job.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        result_id = str(job.analysis_result_id) if job.analysis_result_id else None
+        return Response(
+            {
+                'state': job.status,
+                'progress': job.progress,
+                'result_id': result_id,
+                'report_status': job.report_status or None,
+                'error': job.error_message or None,
+                'patient_id': str(job.patient_id),
+            }
+        )
 
     @action(detail=False, methods=['post'], url_path='save')
     def save_result(self, request):

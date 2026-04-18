@@ -1,0 +1,24 @@
+[Unit]
+Description=Celery worker for Compliance 360 (async AI analysis)
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target redis-server.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/Compliance-360/backend
+Environment=PATH=/root/Compliance-360/backend/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=-/root/Compliance-360/backend/.env
+ExecStart=/root/Compliance-360/backend/venv/bin/celery -A core worker --loglevel=info --concurrency=2
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=compliance360-celery
+
+# Hardening (optional; comment out if worker needs broader filesystem access)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
