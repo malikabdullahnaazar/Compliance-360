@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Settings, X, KeyRound } from 'lucide-react';
 import Button from '../ui/Button';
 
-const ResetPasswordModal = ({ isOpen, onClose, onConfirm, submitting }) => {
+const ResetPasswordModal = ({ isOpen, onClose, onConfirm, submitting, email = '', username = '' }) => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
@@ -63,6 +63,21 @@ const ResetPasswordModal = ({ isOpen, onClose, onConfirm, submitting }) => {
                         <p className="text-sm text-center text-gray-600 dark:text-gray-300 mb-4">
                             Please enter your new password below.
                         </p>
+
+                        <div className="mb-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+                            <div>
+                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Email</span>
+                                <p className="mt-0.5 truncate text-sm text-gray-900 dark:text-gray-100" title={email || '—'}>
+                                    {email || '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Username</span>
+                                <p className="mt-0.5 truncate text-sm text-gray-900 dark:text-gray-100" title={username || '—'}>
+                                    {username || '—'}
+                                </p>
+                            </div>
+                        </div>
 
                         <div className="space-y-3">
                             <div>

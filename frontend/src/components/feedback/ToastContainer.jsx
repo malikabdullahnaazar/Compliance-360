@@ -46,7 +46,7 @@ const ToastContainer = () => {
   }
 
   return (
-    <div className="pointer-events-none fixed right-4 top-20 z-50 flex w-full flex-col items-end gap-2 sm:w-auto">
+    <div className="pointer-events-none fixed right-4 top-20 z-[9999] flex w-full flex-col items-end gap-2 sm:w-auto">
       {toasts.map((toast) => {
         const Icon = typeIcon[toast.type] || Info;
         return (

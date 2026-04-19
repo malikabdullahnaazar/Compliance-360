@@ -145,7 +145,7 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       icon: ClipboardList,
       label: 'Assigned Audit Reports',
       path: '/assigned-audit-reports',
-      roles: ['agency_admin', 'clinician'],
+      roles: ['agency_admin', 'qa_compliance', 'clinician'],
     },
   ];
 
@@ -165,7 +165,9 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       if (['admin/agencies', 'admin/users', 'analytics', 'agency-dashboard'].includes(item.path.replace(/^\//, ''))) {
         return false;
       }
-      return ['/dashboard', '/agency-users', '/patients', '/documents', '/ai-analyzer', '/assigned-audit-reports'].includes(item.path);
+      return ['/dashboard', '/agency-users', '/patients', '/documents', '/ai-analyzer', '/assigned-audit-reports'].includes(
+        item.path,
+      );
     }
     // Clinician can only see Overview and Assigned Audit Reports
     if (user?.role === 'clinician') {
@@ -199,34 +201,42 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
         aria-label="Sidebar"
       >
         <div className="flex h-full flex-col">
-          <div className="flex h-16 items-center justify-between border-b border-gray-200 dark:border-gray-800 px-4">
-            {!isCollapsed && (
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {getRoleDisplayName(user?.role)}
-              </h2>
-            )}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleToggle}
-                className="hidden lg:block rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
-                aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                ) : (
-                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                )}
-              </button>
-              {/* Mobile Close Button */}
-              <button
-                type="button"
-                onClick={onClose}
-                className="lg:hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+          <div className="flex min-h-16 flex-col gap-1 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              {!isCollapsed && (
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {getRoleDisplayName(user?.role)}
+                </h2>
+              )}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleToggle}
+                  className="hidden lg:block rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
+                  aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="lg:hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 cursor-pointer"
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
             </div>
+            {!isCollapsed && user?.username && ['qa_compliance', 'clinician'].includes(user?.role) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={user.username}>
+                <span className="font-medium text-gray-600 dark:text-gray-300">Username</span>{' '}
+                <span className="font-semibold text-gray-900 dark:text-white">{user.username}</span>
+              </p>
+            )}
           </div>
 
           <nav className="flex-1 space-y-1 px-3 py-4" aria-label="Sidebar navigation">
@@ -297,6 +307,8 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
           onClose={() => setIsResetPasswordModalOpen(false)}
           onConfirm={handleConfirmResetPassword}
           submitting={isSubmittingPassword}
+          email={user?.email}
+          username={user?.username}
         />
       </aside>
     </>

@@ -40,10 +40,21 @@ export const documentService = {
     return api.delete(`/ai/documents/${id}/`);
   },
 
-  // Download document
+  // Download document (Document library / direct document API — agency QA+admin)
   downloadDocument: (id) => {
     return api.get(`/ai/documents/${id}/download/`, {
       responseType: 'blob',
     });
+  },
+
+  /**
+   * Download an AI source document in the context of an assigned audit report.
+   * Use this for clinicians and anyone viewing analyzed sources via assignment (not /ai/documents/...).
+   */
+  downloadAnalyzedSourceFromAssignment: (assignmentId, docId) => {
+    return api.get(
+      `/ai/mistral/assigned/${assignmentId}/analyzed_documents/${docId}/download/`,
+      { responseType: 'blob' },
+    );
   },
 };

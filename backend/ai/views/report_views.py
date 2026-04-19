@@ -235,35 +235,57 @@ class ReportAnalyzeView(viewsets.ViewSet):
     def get_result_detail(self, request, result_id=None):
         """GET /api/ai/mistral/results/<result_id>/detail/"""
         from django.db.models import Exists, OuterRef
+
+        user = request.user
         try:
-            r = AIAnalysisResult.objects.select_related('patient', 'created_by').annotate(
+            r = AIAnalysisResult.objects.select_related('patient', 'created_by', 'agency').annotate(
                 is_assigned=Exists(AssignedAuditReport.objects.filter(analysis_result=OuterRef('pk')))
             ).get(pk=result_id)
         except AIAnalysisResult.DoesNotExist:
             return Response({'error': 'Result not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        if getattr(user, 'role', None) != 'superadmin':
+            if user.agency_id:
+                if not r.agency_id or r.agency_id != user.agency_id:
+                    return Response(
+                        {'error': 'Permission denied'},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            else:
+                return Response(
+                    {'error': 'Permission denied'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         analyzed_docs = AuditDocument.objects.filter(
             patient=r.patient,
             filename__in=r.analyzed_document_names
         ).values('id', 'filename', 'document_type', 'file_size_mb')
-        
-        analyzed_documents_info = [
-            {
-                'id': str(d['id']),
-                'filename': d['filename'],
-                'document_type': d['document_type'],
-                'file_size_mb': round(d['file_size_mb'], 2),
-            }
-            for d in analyzed_docs
-        ]
 
-        assignment_with_doc = AssignedAuditReport.objects.filter(
-            analysis_result=r,
-            uploaded_document__isnull=False
-        ).exclude(uploaded_document='').select_related('assigned_to').first()
+        analyzed_documents_info = []
+        for d in analyzed_docs:
+            size_mb = d['file_size_mb']
+            analyzed_documents_info.append(
+                {
+                    'id': str(d['id']),
+                    'filename': d['filename'],
+                    'document_type': d['document_type'],
+                    'file_size_mb': round(size_mb, 2) if size_mb is not None else None,
+                }
+            )
+
+        assignment = (
+            AssignedAuditReport.objects.filter(analysis_result=r)
+            .select_related('assigned_to')
+            .order_by('-assigned_at')
+            .first()
+        )
+        has_upload = bool(assignment and assignment.uploaded_document)
+        clinician_doc_status = 'submitted' if has_upload else 'pending'
 
         detail = {
             'id': str(r.id),
+            'patient_id': str(r.patient_id),
             'patient_name': f'{r.patient.first_name} {r.patient.last_name}',
             'report_markdown': r.report_markdown,
             'analyzed_documents': analyzed_documents_info,
@@ -271,15 +293,22 @@ class ReportAnalyzeView(viewsets.ViewSet):
             'status': r.status,
             'created_at': r.created_at.isoformat(),
             'is_assigned': r.is_assigned,
+            'clinician_assignment_id': str(assignment.id) if assignment else None,
+            'clinician_document_status': clinician_doc_status,
+            'has_clinician_document': has_upload,
+            'clinician_document_name': (assignment.uploaded_document_name if assignment else '') or '',
+            'clinician_name': (
+                assignment.assigned_to.get_full_name()
+                if assignment and assignment.assigned_to
+                else None
+            ),
+            'clinician_document_submitted_at': (
+                assignment.completed_at.isoformat()
+                if assignment and assignment.completed_at
+                else None
+            ),
         }
-        
-        if assignment_with_doc:
-            detail.update({
-                'has_clinician_document': True,
-                'clinician_document_name': assignment_with_doc.uploaded_document_name,
-                'clinician_name': assignment_with_doc.assigned_to.get_full_name()
-            })
-            
+
         return Response(detail)
 
     @action(detail=False, methods=['post'], url_path='results/(?P<result_id>[^/.]+)/submit_document')

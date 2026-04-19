@@ -27,6 +27,7 @@ import Modal from '../components/common/Modal';
 import { getUsers, createUser, updateUser, deleteUser, toggleUserStatus, getAgencies } from '../services/admin.service';
 import { useDispatch } from 'react-redux';
 import { addToast } from '../store/slices/uiSlice';
+import { formatApiError } from '../lib/utils';
 
 const UsersPage = () => {
     const { user } = useContext(AuthContext);
@@ -225,16 +226,10 @@ const UsersPage = () => {
             setIsCreateModalOpen(false);
             loadData();
         } catch (error) {
-            const errorData = error.response?.data;
-            if (errorData) {
-                const errorMsg = errorData.email?.[0] ||
-                    errorData.username?.[0] ||
-                    errorData.detail ||
-                    'Failed to create user';
-                dispatch(addToast({ type: 'error', message: errorMsg }));
-            } else {
-                dispatch(addToast({ type: 'error', message: 'Failed to create user' }));
-            }
+            dispatch(addToast({
+                type: 'error',
+                message: formatApiError(error.response?.data, 'Failed to create user'),
+            }));
         } finally {
             setSubmitting(false);
         }
@@ -257,16 +252,10 @@ const UsersPage = () => {
             setIsEditModalOpen(false);
             loadData();
         } catch (error) {
-            const errorData = error.response?.data;
-            if (errorData) {
-                const errorMsg = errorData.email?.[0] ||
-                    errorData.username?.[0] ||
-                    errorData.detail ||
-                    'Failed to update user';
-                dispatch(addToast({ type: 'error', message: errorMsg }));
-            } else {
-                dispatch(addToast({ type: 'error', message: 'Failed to update user' }));
-            }
+            dispatch(addToast({
+                type: 'error',
+                message: formatApiError(error.response?.data, 'Failed to update user'),
+            }));
         } finally {
             setSubmitting(false);
         }
@@ -689,6 +678,9 @@ const UsersPage = () => {
                         {formErrors.username && (
                             <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.username}</p>
                         )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Usernames are unique per agency (the same username may exist at another agency).
+                        </p>
                     </div>
                     <div>
                         <label htmlFor="agency" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

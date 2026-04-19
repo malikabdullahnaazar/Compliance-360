@@ -142,7 +142,7 @@ function AppRoutes() {
       <Route
         path="/assigned-audit-reports"
         element={
-          <RoleBasedRoute allowedRoles={['agency_admin', 'clinician']} redirectTo="/dashboard">
+          <RoleBasedRoute allowedRoles={['agency_admin', 'qa_compliance', 'clinician']} redirectTo="/dashboard">
             <AssignedAuditReportsPage />
           </RoleBasedRoute>
         }

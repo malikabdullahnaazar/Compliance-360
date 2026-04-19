@@ -15,6 +15,7 @@ import Card, { CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { addToast } from '../store/slices/uiSlice';
 import api from '../services/api';
+import { documentService } from '../services/document.service';
 import AuthContext from '../context/AuthContext';
 
 /* ─── API helpers ─────────────────────────────────────────────────────────── */
@@ -26,8 +27,6 @@ const uploadDoc = (id, formData) =>
     });
 const downloadAssignedDoc = (id) =>
     api.get(`/ai/mistral/assigned/${id}/download_document/`, { responseType: 'blob' });
-const downloadAnalyzedDoc = (docId) =>
-    api.get(`/ai/documents/${docId}/download/`, { responseType: 'blob' });
 
 /* ─── Markdown components ─────────────────────────────────────────────────── */
 const MD_PLUGINS = [remarkGfm, remarkBreaks];
@@ -113,6 +112,7 @@ const AssignedAuditReportsPage = () => {
     const dispatch = useDispatch();
     const { user } = useContext(AuthContext);
     const isClinician = user?.role === 'clinician';
+    const isQa = user?.role === 'qa_compliance';
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -200,7 +200,13 @@ const AssignedAuditReportsPage = () => {
             fd.append('document', selectedFile);
             const res = await uploadDoc(detailItem.id, fd);
             dispatch(addToast({ type: 'success', message: 'Document uploaded! Report marked as Complete.' }));
-            setDetailItem((prev) => ({ ...prev, ...res.data }));
+            setDetailItem((prev) => ({
+                ...prev,
+                status: res.data?.status ?? 'complete',
+                has_document: res.data?.has_document ?? true,
+                uploaded_document_name: res.data?.uploaded_document_name ?? prev.uploaded_document_name,
+                completed_at: res.data?.completed_at ?? prev.completed_at,
+            }));
             setSelectedFile(null);
             // Refresh list
             loadAssignments();
@@ -239,9 +245,10 @@ const AssignedAuditReportsPage = () => {
     };
 
     const handleViewAnalyzedDoc = async (docId, filename) => {
+        if (!detailItem?.id) return;
         setDownloadingDocId(docId);
         try {
-            const res = await downloadAnalyzedDoc(docId);
+            const res = await documentService.downloadAnalyzedSourceFromAssignment(detailItem.id, docId);
             const mimeType = filename.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream';
             const url = window.URL.createObjectURL(new Blob([res.data], { type: mimeType }));
             window.open(url, '_blank');
@@ -253,9 +260,10 @@ const AssignedAuditReportsPage = () => {
     };
 
     const handleDownloadAnalyzedDoc = async (docId, filename) => {
+        if (!detailItem?.id) return;
         setDownloadingDocId(docId);
         try {
-            const res = await downloadAnalyzedDoc(docId);
+            const res = await documentService.downloadAnalyzedSourceFromAssignment(detailItem.id, docId);
             const url = window.URL.createObjectURL(new Blob([res.data]));
             const a = document.createElement('a');
             a.href = url;
@@ -317,6 +325,12 @@ const AssignedAuditReportsPage = () => {
                                                                 {detailItem.patient_name}
                                                             </span>
                                                         </p>
+                                                        {(isClinician || isQa) && user?.username && (
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                <span className="font-medium text-gray-600 dark:text-gray-300">Username</span>{' '}
+                                                                <span className="font-semibold text-gray-800 dark:text-gray-200">{user.username}</span>
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -763,6 +777,23 @@ const AssignedAuditReportsPage = () => {
                                         ? 'Audit reports assigned to you. Review the AI analysis and submit your compliance document to complete each report.'
                                         : 'All audit reports assigned to clinicians in your agency.'}
                                 </p>
+                                {(isClinician || isQa) && user?.username && (
+                                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                        <span className="text-gray-500 dark:text-gray-400">Username</span>{' '}
+                                        <span className="font-semibold text-gray-900 dark:text-white">{user.username}</span>
+                                        {user?.email ? (
+                                            <>
+                                                <span className="mx-2 text-gray-300 dark:text-gray-600" aria-hidden="true">
+                                                    ·
+                                                </span>
+                                                <span className="text-gray-500 dark:text-gray-400">Email</span>{' '}
+                                                <span className="font-medium text-gray-800 dark:text-gray-200 truncate inline-block max-w-[220px] align-bottom">
+                                                    {user.email}
+                                                </span>
+                                            </>
+                                        ) : null}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Loading */}

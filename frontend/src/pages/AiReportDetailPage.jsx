@@ -429,7 +429,12 @@ const AiReportDetailPage = () => {
     /* ── Source document actions ── */
     const handleViewDoc = async (doc) => {
         try {
-            const response = await documentService.downloadDocument(doc.id);
+            const response = result?.clinician_assignment_id
+                ? await documentService.downloadAnalyzedSourceFromAssignment(
+                    result.clinician_assignment_id,
+                    doc.id,
+                )
+                : await documentService.downloadDocument(doc.id);
             const contentType =
                 response.headers?.['content-type'] ||
                 response.headers?.get?.('content-type') ||
@@ -445,7 +450,12 @@ const AiReportDetailPage = () => {
 
     const handleDownloadDoc = async (doc) => {
         try {
-            const response = await documentService.downloadDocument(doc.id);
+            const response = result?.clinician_assignment_id
+                ? await documentService.downloadAnalyzedSourceFromAssignment(
+                    result.clinician_assignment_id,
+                    doc.id,
+                )
+                : await documentService.downloadDocument(doc.id);
             const blob = new Blob([response.data], { type: 'application/octet-stream' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');

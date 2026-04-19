@@ -1,10 +1,9 @@
 import { useContext } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   MoonStar,
   SunMedium,
-  Bell,
   User,
   LayoutDashboard,
   LogIn,
@@ -12,7 +11,6 @@ import {
   ShieldCheck,
   Home,
   Menu,
-  X,
 } from 'lucide-react';
 import LogoutModal from '../common/LogoutModal';
 import { useState } from 'react';
@@ -76,14 +74,25 @@ const Navbar = ({ variant = 'app', onMenuToggle }) => {
           {user && (
             <>
               {/* Agency Name Display - Hidden for superadmins */}
+              <div className="flex max-w-[min(11rem,46vw)] items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 sm:max-w-none sm:px-3">
+                <User className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-400" aria-hidden="true" />
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    Username
+                  </span>
+                  <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    {user.username}
+                  </span>
+                </div>
+              </div>
               {user.agency_name && user.role !== 'superadmin' && (
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800">
-                  <ShieldCheck className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                  <div className="flex items-baseline gap-1.5">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-400" aria-hidden="true" />
+                  <div className="flex min-w-0 flex-col">
                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                      Agency:
+                      Agency
                     </span>
-                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
                       {user.agency_name}
                     </span>
                   </div>

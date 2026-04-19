@@ -116,6 +116,23 @@ const Dashboard = () => {
 
   const renderClinicianDashboard = () => (
     <div className="space-y-8">
+      {(user?.username || user?.email) && (
+        <section
+          className="rounded-xl border border-gray-200 bg-gray-50/90 px-4 py-3 text-sm text-gray-600
+            dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300"
+          aria-label="Your account"
+        >
+          <span className="font-medium text-gray-800 dark:text-gray-100">Signed in as </span>
+          {user?.username && (
+            <span className="font-semibold text-gray-900 dark:text-white">{user.username}</span>
+          )}
+          {user?.email && (
+            <span className="block sm:inline sm:before:content-['_·_'] sm:before:font-normal text-gray-500 dark:text-gray-400 truncate">
+              {user.email}
+            </span>
+          )}
+        </section>
+      )}
       {/* Stats Cards */}
       <section className="grid gap-4 sm:grid-cols-3">
         <Card className="p-5">
@@ -399,6 +416,23 @@ const Dashboard = () => {
 
   const renderAgencyAdminDashboard = () => (
     <div className="space-y-8">
+      {user?.role === 'qa_compliance' && (user?.username || user?.email) && (
+        <section
+          className="rounded-xl border border-gray-200 bg-gray-50/90 px-4 py-3 text-sm text-gray-600
+            dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300"
+          aria-label="Your account"
+        >
+          <span className="font-medium text-gray-800 dark:text-gray-100">Signed in as </span>
+          {user?.username && (
+            <span className="font-semibold text-gray-900 dark:text-white">{user.username}</span>
+          )}
+          {user?.email && (
+            <span className="block sm:inline sm:before:content-['_·_'] sm:before:font-normal text-gray-500 dark:text-gray-400 truncate">
+              {user.email}
+            </span>
+          )}
+        </section>
+      )}
       {/* Stats Cards */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-5">
@@ -534,7 +568,12 @@ const Dashboard = () => {
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
                 {user?.role === 'superadmin' ? 'System Overview' : user?.role === 'qa_compliance' ? 'QA/Compliance Overview' : user?.role === 'clinician' ? 'Clinician Overview' : 'Agency Overview'}
               </h1>
-              <p className="mt-2 text-lg text-gray-600 dark:text-gray-300">
+              {user?.username && (
+                <p className="mt-1 text-base font-medium text-teal-700 dark:text-teal-300">
+                  Welcome, {user.username}.
+                </p>
+              )}
+              <p className="mt-3 text-lg text-gray-600 dark:text-gray-300">
                 {user?.role === 'superadmin'
                   ? 'Monitor system performance, manage agencies, and oversee compliance across all organizations.'
                   : user?.role === 'qa_compliance'

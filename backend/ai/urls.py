@@ -44,5 +44,10 @@ urlpatterns = [
     path('mistral/assigned/<pk>/detail/', AssignedAuditReportView.as_view({'get': 'get_detail'}), name='mistral-assignment-detail'),
     path('mistral/assigned/<pk>/upload_document/', AssignedAuditReportView.as_view({'post': 'upload_document'}), name='mistral-upload-doc'),
     path('mistral/assigned/<pk>/download_document/', AssignedAuditReportView.as_view({'get': 'download_document'}), name='mistral-download-doc'),
+    path(
+        'mistral/assigned/<pk>/analyzed_documents/<doc_id>/download/',
+        AssignedAuditReportView.as_view({'get': 'download_analyzed_source'}),
+        name='mistral-assignment-analyzed-download',
+    ),
     path('mistral/clinicians/', AssignedAuditReportView.as_view({'get': 'list_clinicians'}), name='mistral-clinicians'),
 ]
