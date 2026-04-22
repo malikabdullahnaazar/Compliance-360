@@ -20,6 +20,35 @@ export const documentService = {
     });
   },
 
+  // New flow: start chart intake (PDF only) -> returns { job_id }
+  startChartIntake: (formData) => {
+    return api.post('/ai/documents/chart_intake/start/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // New flow: poll chart intake status
+  getChartIntakeStatus: (jobId) => {
+    return api.get(`/ai/documents/chart_intake/${jobId}/status/`);
+  },
+
+  // New flow: cancel chart intake
+  cancelChartIntake: (jobId) => {
+    return api.post(`/ai/documents/chart_intake/${jobId}/cancel/`);
+  },
+
+  // New flow: confirm create patient + attach document
+  createPatientAndAttachFromIntake: (jobId, payload) => {
+    return api.post(`/ai/documents/chart_intake/${jobId}/create_patient_and_attach/`, payload);
+  },
+
+  // New flow: attach to existing patient (duplicate edge case)
+  attachExistingPatientFromIntake: (jobId, patientId) => {
+    return api.post(`/ai/documents/chart_intake/${jobId}/attach_existing/`, { patient_id: patientId });
+  },
+
   // Get documents by patient
   getDocumentsByPatient: (patientId) => {
     return api.get(`/ai/documents/by_patient/?patient_id=${patientId}`);

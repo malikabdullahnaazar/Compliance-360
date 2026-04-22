@@ -516,6 +516,86 @@ class AnalysisJob(models.Model):
         return f"AnalysisJob {self.id} ({self.status})"
 
 
+class ChartIntakeJob(models.Model):
+    """
+    Tracks an async chart intake job for "upload chart for new patient".
+
+    This stores the uploaded file temporarily until the user explicitly confirms
+    patient creation + document attachment.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chart_intake_jobs",
+    )
+    agency = models.ForeignKey(
+        "agencies.Agency",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chart_intake_jobs",
+    )
+
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True
+    )
+    progress = models.PositiveSmallIntegerField(default=0)
+    error_message = models.TextField(blank=True)
+
+    filename = models.CharField(max_length=255, blank=True)
+    file_path = models.CharField(max_length=500, blank=True)
+    file_size_mb = models.FloatField(null=True, blank=True)
+    total_pages = models.IntegerField(null=True, blank=True)
+    extraction_method = models.CharField(max_length=20, default="text")
+    extracted_text = models.TextField(blank=True)
+
+    extracted_patient = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Structured extracted patient payload for review modal.",
+    )
+    ambiguous_candidates = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="When ambiguous, array of possible extracted patients.",
+    )
+
+    openai_model = models.CharField(max_length=100, default="gpt-5.4-mini")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["agency"]),
+            models.Index(fields=["created_by"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"ChartIntakeJob {self.id} ({self.status})"
+
+
 class AssignedAuditReport(models.Model):
     """
     Tracks an AI analysis result assigned by an agency admin to a clinician.

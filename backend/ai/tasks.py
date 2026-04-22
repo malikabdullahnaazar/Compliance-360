@@ -4,10 +4,12 @@ from typing import Any, Dict, List
 from celery import shared_task
 from django.db import transaction
 
-from .models import AIAnalysisResult, AnalysisJob, AuditDocument
+from .models import AIAnalysisResult, AnalysisJob, AuditDocument, ChartIntakeJob
 from .services.langchain_service import get_compliance_service
 from .services.report_markdown_builder import build_compliance_report_markdown
 from .utils.report_status import report_status_from_markdown
+from .services.document_processor import get_document_processor
+from .services.patient_intake_extractor import get_patient_intake_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -121,5 +123,87 @@ def run_analysis_job(self, job_uuid: str) -> None:
         _job_update(
             job_uuid,
             status=AnalysisJob.STATUS_FAILED,
+            error_message=str(exc)[:4000],
+        )
+
+
+def _intake_update(job_id, **fields):
+    ChartIntakeJob.objects.filter(pk=job_id).update(**fields)
+
+
+@shared_task(bind=True, ignore_result=True)
+def run_chart_intake_job(self, job_uuid: str) -> None:
+    """Extract patient demographics from an uploaded chart (async)."""
+    try:
+        job = ChartIntakeJob.objects.select_related("created_by", "agency").get(pk=job_uuid)
+    except ChartIntakeJob.DoesNotExist:
+        logger.error("ChartIntakeJob %s not found", job_uuid)
+        return
+
+    if job.status in {ChartIntakeJob.STATUS_CANCELLED, ChartIntakeJob.STATUS_COMPLETED}:
+        return
+
+    task_id = getattr(self.request, "id", "") or ""
+    _intake_update(job_uuid, status=ChartIntakeJob.STATUS_RUNNING, progress=5, celery_task_id=task_id)
+
+    try:
+        if not job.file_path:
+            raise ValueError("No file_path recorded for intake job")
+
+        processor = get_document_processor()
+        _intake_update(job_uuid, progress=15)
+
+        from django.core.files.storage import default_storage
+
+        with default_storage.open(job.file_path, "rb") as f:
+            file_bytes = f.read()
+
+        processed = processor.process_bytes(
+            file_bytes=file_bytes,
+            filename=job.filename or "chart.pdf",
+            document_type="other",
+        )
+        _intake_update(
+            job_uuid,
+            progress=45,
+            extracted_text=processed.get("content") or "",
+            extraction_method=processed.get("extraction_method") or "text",
+            file_size_mb=processed.get("file_size_mb"),
+            total_pages=processed.get("total_pages"),
+        )
+
+        chart_text = processed.get("content") or ""
+        if not chart_text.strip():
+            raise ValueError("Could not extract text from PDF (possibly scanned/corrupted).")
+
+        extractor = get_patient_intake_extractor(model_name=(job.openai_model or "gpt-5.4-mini"))
+        _intake_update(job_uuid, progress=70)
+        extracted = extractor.extract(chart_text)
+
+        if extracted.status == "ambiguous":
+            _intake_update(
+                job_uuid,
+                status=ChartIntakeJob.STATUS_COMPLETED,
+                progress=100,
+                extracted_patient=extracted.patient,
+                ambiguous_candidates=extracted.candidates,
+                error_message="",
+            )
+            return
+
+        _intake_update(
+            job_uuid,
+            status=ChartIntakeJob.STATUS_COMPLETED,
+            progress=100,
+            extracted_patient=extracted.patient,
+            ambiguous_candidates=[],
+            error_message="",
+        )
+
+    except Exception as exc:
+        logger.exception("ChartIntakeJob %s failed: %s", job_uuid, exc)
+        _intake_update(
+            job_uuid,
+            status=ChartIntakeJob.STATUS_FAILED,
             error_message=str(exc)[:4000],
         )
