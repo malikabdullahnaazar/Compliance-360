@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   User,
   Calendar,
@@ -59,6 +59,23 @@ const PatientReviewModal = ({
   const [errors, setErrors] = useState({});
 
   const candidates = Array.isArray(ambiguousCandidates) ? ambiguousCandidates : [];
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData(prev => ({
+      ...prev,
+      ...initial,
+      selected_candidate_index: 0,
+      name_identifier: prev.name_identifier || '',
+    }));
+    setErrors({});
+  }, [isOpen, initial]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!candidates.length) return;
+    setFormData(prev => ({ ...prev, selected_candidate_index: 0 }));
+  }, [isOpen, candidates.length]);
 
   const applyCandidate = (idx) => {
     const c = candidates[idx] || {};
