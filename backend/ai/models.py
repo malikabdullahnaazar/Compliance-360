@@ -660,3 +660,35 @@ class AssignedAuditReport(models.Model):
 
     def __str__(self):
         return f"Assignment – {self.analysis_result} → {self.assigned_to}"
+
+
+class PromptTemplate(models.Model):
+    """
+    Stores system prompts used across the application.
+    Allows super-admins to fine-tune AI behavior dynamically.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    identifier = models.CharField(max_length=100, unique=True, help_text="Unique identifier used in code (e.g., 'chart_extraction')")
+    name = models.CharField(max_length=200, help_text="Human-readable name")
+    description = models.TextField(blank=True, help_text="What this prompt is used for")
+    
+    # We store the entire prompt text here. Constraints should be clearly marked or included.
+    prompt_text = models.TextField(help_text="The actual prompt text sent to the AI. Use variables like {document_text} if applicable.")
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_prompts'
+    )
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+

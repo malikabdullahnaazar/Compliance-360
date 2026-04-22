@@ -11,6 +11,7 @@ from .views import (
     DocumentManagementViewSet,
     MistralAnalyzeView,
     AssignedAuditReportView,
+    PromptTemplateViewSet,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register(r'audit-sessions', AuditSessionViewSet, basename='audit-session'
 router.register(r'findings', ComplianceFindingViewSet, basename='finding')
 router.register(r'documents', DocumentManagementViewSet, basename='document')
 router.register(r'mistral/assignments', AssignedAuditReportView, basename='mistral-assignments')
+router.register(r'prompts', PromptTemplateViewSet, basename='prompt-template')
 
 urlpatterns = [
     path('', include(router.urls)),

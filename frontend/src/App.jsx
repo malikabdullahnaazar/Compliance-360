@@ -9,6 +9,7 @@ import UsersPage from './pages/UsersPage';
 import AgencyDashboard from './pages/AgencyDashboard';
 import AgencyUsersPage from './pages/AgencyUsersPage';
 import PatientsPage from './pages/PatientsPage';
+import PromptManagementPage from './pages/PromptManagementPage';
 import NewPatientForm from './pages/NewPatientForm';
 import PatientDetailsPage from './pages/PatientDetailsPage';
 import DocumentsPage from './pages/DocumentsPage';
@@ -64,6 +65,14 @@ function AppRoutes() {
         element={
           <RoleBasedRoute allowedRoles={['superadmin']} redirectTo="/dashboard">
             <UsersPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/admin/prompts"
+        element={
+          <RoleBasedRoute allowedRoles={['superadmin']} redirectTo="/dashboard">
+            <PromptManagementPage />
           </RoleBasedRoute>
         }
       />

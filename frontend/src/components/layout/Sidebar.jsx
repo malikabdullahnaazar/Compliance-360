@@ -112,6 +112,12 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
       roles: ['superadmin'],
     },
     {
+      icon: Brain,
+      label: 'Prompt Management',
+      path: '/admin/prompts',
+      roles: ['superadmin'],
+    },
+    {
       icon: ShieldCheck,
       label: 'Agency Dashboard',
       path: '/agency-dashboard',

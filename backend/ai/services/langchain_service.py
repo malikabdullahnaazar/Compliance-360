@@ -113,8 +113,18 @@ class LangChainComplianceService:
 
         # 2. Construct messages (system prompt includes all 63 red flag checks)
         logger.info("Step 2/4: Constructing message payload...")
+        from ..models import PromptTemplate
+        
+        system_content = COMPLIANCE_AUDITOR_SYSTEM_PROMPT
+        try:
+            template = PromptTemplate.objects.filter(identifier='compliance_auditor', is_active=True).first()
+            if template and template.prompt_text.strip():
+                system_content = template.prompt_text
+        except Exception as e:
+            logger.error(f"Error fetching PromptTemplate: {e}")
+
         messages = [
-            SystemMessage(content=COMPLIANCE_AUDITOR_SYSTEM_PROMPT),
+            SystemMessage(content=system_content),
             HumanMessage(content=user_content)
         ]
 

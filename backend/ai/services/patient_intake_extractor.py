@@ -104,15 +104,25 @@ class PatientIntakeExtractor:
         )
 
     def extract(self, chart_text: str) -> PatientExtractionResult:
-        system = SystemMessage(
-            content=(
-                "You extract patient demographics from clinical chart text. "
-                "Return ONLY valid JSON (no markdown). "
-                "If multiple names/DOBs appear, set status='ambiguous' and provide candidates. "
-                "If name or DOB cannot be found at all, set status='insufficient_data'. "
-                "DOB must be returned as mm/dd/yyyy when possible."
-            )
+        from ..models import PromptTemplate
+        
+        # Default prompt
+        system_content = (
+            "You extract patient demographics from clinical chart text. "
+            "Return ONLY valid JSON (no markdown). "
+            "If multiple names/DOBs appear, set status='ambiguous' and provide candidates. "
+            "If name or DOB cannot be found at all, set status='insufficient_data'. "
+            "DOB must be returned as mm/dd/yyyy when possible."
         )
+
+        try:
+            template = PromptTemplate.objects.filter(identifier='patient_intake_extractor', is_active=True).first()
+            if template and template.prompt_text.strip():
+                system_content = template.prompt_text
+        except Exception as e:
+            logger.error(f"Error fetching PromptTemplate: {e}")
+
+        system = SystemMessage(content=system_content)
         user = HumanMessage(
             content=(
                 "Extract these fields if present: first_name, last_name, patient_name (optional), "
