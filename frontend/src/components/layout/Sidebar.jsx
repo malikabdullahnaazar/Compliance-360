@@ -16,6 +16,7 @@ import {
   Brain,
   ClipboardList,
   Settings,
+  FlaskConical,
 } from 'lucide-react';
 import { addToast } from '../../store/slices/uiSlice';
 import AuthContext from '../../context/AuthContext';
@@ -113,8 +114,14 @@ const Sidebar = ({ onToggle, isOpen, onClose }) => {
     },
     {
       icon: Brain,
-      label: 'Prompt Management',
+      label: 'Train AI',
       path: '/admin/prompts',
+      roles: ['superadmin'],
+    },
+    {
+      icon: FlaskConical,
+      label: 'Test AI Analyzer',
+      path: '/admin/test-analyzer',
       roles: ['superadmin'],
     },
     {

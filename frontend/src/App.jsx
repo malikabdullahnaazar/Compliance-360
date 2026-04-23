@@ -10,6 +10,7 @@ import AgencyDashboard from './pages/AgencyDashboard';
 import AgencyUsersPage from './pages/AgencyUsersPage';
 import PatientsPage from './pages/PatientsPage';
 import PromptManagementPage from './pages/PromptManagementPage';
+import SuperAdminTestAnalyzerPage from './pages/SuperAdminTestAnalyzerPage';
 import NewPatientForm from './pages/NewPatientForm';
 import PatientDetailsPage from './pages/PatientDetailsPage';
 import DocumentsPage from './pages/DocumentsPage';
@@ -73,6 +74,14 @@ function AppRoutes() {
         element={
           <RoleBasedRoute allowedRoles={['superadmin']} redirectTo="/dashboard">
             <PromptManagementPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/admin/test-analyzer"
+        element={
+          <RoleBasedRoute allowedRoles={['superadmin']} redirectTo="/dashboard">
+            <SuperAdminTestAnalyzerPage />
           </RoleBasedRoute>
         }
       />

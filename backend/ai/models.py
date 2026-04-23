@@ -719,3 +719,88 @@ class PromptTemplate(models.Model):
     def __str__(self):
         return self.name
 
+
+class SuperAdminTestJob(models.Model):
+    """
+    Tracks an async AI test analysis job initiated by a super admin.
+    Accepts a raw uploaded PDF/chart instead of a patient-linked document.
+    Completely isolated from agency data.
+    """
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="superadmin_test_jobs",
+    )
+    celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
+
+    filename = models.CharField(max_length=255, blank=True)
+    file_path = models.CharField(max_length=500, blank=True)
+    extracted_text = models.TextField(blank=True)
+
+    ai_model = models.CharField(max_length=100, default="gpt-5.4")
+    prompt_id = models.UUIDField(null=True, blank=True, help_text="ID of the PromptTemplate used")
+    prompt_name = models.CharField(max_length=200, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    progress = models.PositiveSmallIntegerField(default=0)
+    error_message = models.TextField(blank=True)
+    report_status = models.CharField(
+        max_length=10,
+        choices=[("Pass", "Pass"), ("Fail", "Fail")],
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"SuperAdminTestJob {self.id} ({self.status})"
+
+
+class SuperAdminTestResult(models.Model):
+    """
+    Stores the single latest AI test result per (superadmin, status).
+    Only one 'Pass' and one 'Fail' result is kept per superadmin — old ones are replaced.
+    Completely isolated from agency AIAnalysisResult records.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="superadmin_test_results",
+    )
+
+    filename = models.CharField(max_length=255, blank=True)
+    ai_model_used = models.CharField(max_length=100, blank=True)
+    prompt_name = models.CharField(max_length=200, blank=True)
+    report_markdown = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=[("Pass", "Pass"), ("Fail", "Fail")],
+        default="Fail",
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"SuperAdminTestResult {self.id} ({self.status})"
+

@@ -12,6 +12,7 @@ from .views import (
     MistralAnalyzeView,
     AssignedAuditReportView,
     PromptTemplateViewSet,
+    SuperAdminTestViewSet,
 )
 
 router = DefaultRouter()
@@ -52,4 +53,9 @@ urlpatterns = [
         name='mistral-assignment-analyzed-download',
     ),
     path('mistral/clinicians/', AssignedAuditReportView.as_view({'get': 'list_clinicians'}), name='mistral-clinicians'),
+    # SuperAdmin Test Analyzer endpoints
+    path('superadmin-test/start/', SuperAdminTestViewSet.as_view({'post': 'start'}), name='superadmin-test-start'),
+    path('superadmin-test/<str:job_id>/status/', SuperAdminTestViewSet.as_view({'get': 'job_status'}), name='superadmin-test-status'),
+    path('superadmin-test/results/', SuperAdminTestViewSet.as_view({'get': 'list_results'}), name='superadmin-test-results'),
+    path('superadmin-test/results/<str:result_id>/', SuperAdminTestViewSet.as_view({'get': 'get_result'}), name='superadmin-test-result-detail'),
 ]

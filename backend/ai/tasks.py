@@ -195,3 +195,143 @@ def run_chart_intake_job(self, job_uuid: str) -> None:
             status=ChartIntakeJob.STATUS_FAILED,
             error_message=str(exc)[:4000],
         )
+
+
+def _test_job_update(job_id, **fields):
+    from .models import SuperAdminTestJob
+    SuperAdminTestJob.objects.filter(pk=job_id).update(**fields)
+
+
+@shared_task(bind=True, ignore_result=True)
+def run_superadmin_test_job(self, job_uuid: str) -> None:
+    """
+    Execute an AI analysis for a SuperAdminTestJob.
+    Accepts a raw uploaded PDF chart, runs compliance analysis using the
+    selected model and prompt, then stores the result in SuperAdminTestResult
+    (replacing the previous result of the same status for this superadmin).
+    """
+    from .models import SuperAdminTestJob, SuperAdminTestResult, PromptTemplate
+
+    try:
+        job = SuperAdminTestJob.objects.select_related("created_by").get(pk=job_uuid)
+    except SuperAdminTestJob.DoesNotExist:
+        logger.error("SuperAdminTestJob %s not found", job_uuid)
+        return
+
+    if job.status in {SuperAdminTestJob.STATUS_COMPLETED, SuperAdminTestJob.STATUS_FAILED}:
+        return
+
+    task_id = getattr(self.request, "id", "") or ""
+    _test_job_update(job_uuid, status=SuperAdminTestJob.STATUS_RUNNING, progress=5, celery_task_id=task_id)
+
+    try:
+        # Fetch extracted text (already extracted during upload)
+        extracted_text = job.extracted_text
+        if not extracted_text.strip():
+            # Try to extract now from file_path
+            from django.core.files.storage import default_storage
+            processor = get_document_processor()
+            if job.file_path:
+                with default_storage.open(job.file_path, "rb") as f:
+                    file_bytes = f.read()
+                processed = processor.process_bytes(
+                    file_bytes=file_bytes,
+                    filename=job.filename or "chart.pdf",
+                    document_type="other",
+                )
+                extracted_text = processed.get("content") or ""
+                _test_job_update(job_uuid, extracted_text=extracted_text)
+            if not extracted_text.strip():
+                raise ValueError("Could not extract text from the uploaded document.")
+
+        _test_job_update(job_uuid, progress=30)
+
+        # Determine which prompt to use
+        system_content = None
+        if job.prompt_id:
+            try:
+                prompt_obj = PromptTemplate.objects.get(pk=job.prompt_id)
+                system_content = prompt_obj.prompt_text
+                if prompt_obj.response_format and "## RESPONSE FORMAT" not in system_content:
+                    system_content = f"{system_content}\n\n{prompt_obj.response_format}".strip()
+            except PromptTemplate.DoesNotExist:
+                logger.warning("PromptTemplate %s not found, falling back to default", job.prompt_id)
+
+        documents_data = [
+            {
+                "filename": job.filename or "uploaded_chart.pdf",
+                "document_type": "other",
+                "document_type_display": "Uploaded Chart",
+                "extracted_text": extracted_text,
+            }
+        ]
+
+        service = get_compliance_service()
+
+        def progress_cb(pct: int) -> None:
+            _test_job_update(job_uuid, progress=pct)
+
+        # Temporarily override system prompt if a specific prompt was provided
+        import ai.prompts.system_prompts as sp
+        original_prompt = sp.COMPLIANCE_AUDITOR_SYSTEM_PROMPT
+        if system_content:
+            sp.COMPLIANCE_AUDITOR_SYSTEM_PROMPT = system_content
+
+        openai_kw = {}
+        if service.provider != "google":
+            openai_kw["openai_model"] = (job.ai_model or "gpt-5.4").strip()
+
+        try:
+            result = service.analyze_documents(
+                documents=documents_data,
+                patient_info={"patient_id": "superadmin-test", "first_name": "Test", "last_name": "Chart"},
+                progress_callback=progress_cb,
+                **openai_kw,
+            )
+        finally:
+            # Always restore original prompt
+            sp.COMPLIANCE_AUDITOR_SYSTEM_PROMPT = original_prompt
+
+        if result.get("metadata", {}).get("error"):
+            raise ValueError(result.get("metadata", {}).get("details", "AI returned an error payload"))
+
+        _test_job_update(job_uuid, progress=90)
+
+        report_markdown = build_compliance_report_markdown(result, [])
+        report_status = report_status_from_markdown(report_markdown)
+        model_used = result.get("metadata", {}).get("model") or job.ai_model or "unknown"
+
+        with transaction.atomic():
+            # Delete old result with same status for this superadmin (keep only latest)
+            SuperAdminTestResult.objects.filter(
+                created_by=job.created_by,
+                status=report_status,
+            ).delete()
+
+            SuperAdminTestResult.objects.create(
+                created_by=job.created_by,
+                filename=job.filename or "chart.pdf",
+                ai_model_used=str(model_used)[:100],
+                prompt_name=job.prompt_name or "",
+                report_markdown=report_markdown,
+                status=report_status,
+            )
+
+            _test_job_update(
+                job_uuid,
+                status=SuperAdminTestJob.STATUS_COMPLETED,
+                progress=100,
+                report_status=report_status,
+                error_message="",
+            )
+
+        logger.info("SuperAdminTestJob %s completed → status=%s", job_uuid, report_status)
+
+    except Exception as exc:
+        logger.exception("SuperAdminTestJob %s failed: %s", job_uuid, exc)
+        _test_job_update(
+            job_uuid,
+            status=SuperAdminTestJob.STATUS_FAILED,
+            progress=0,
+            error_message=str(exc)[:4000],
+        )
