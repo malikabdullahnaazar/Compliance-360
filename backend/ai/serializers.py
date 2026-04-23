@@ -10,7 +10,8 @@ from .models import (
     RegulatoryCitation,
     CorrectionGuidance,
     RedFlag,
-    AuditRecommendation
+    AuditRecommendation,
+    PromptTemplate
 )
 
 
@@ -286,3 +287,17 @@ class AIFindingResponseSerializer(serializers.Serializer):
     red_flags = serializers.ListField(child=serializers.DictField(), required=False)
     recommendations = serializers.ListField(child=serializers.DictField(), required=False)
     metadata = serializers.DictField()
+
+
+class PromptTemplateSerializer(serializers.ModelSerializer):
+    """Serializer for PromptTemplate, used by super admins to manage AI prompts."""
+    updated_by_name = serializers.CharField(source='updated_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = PromptTemplate
+        fields = [
+            'id', 'identifier', 'name', 'description', 'prompt_text',
+            'prompt_group', 'response_format', 'is_active', 'is_main', 'is_locked',
+            'created_at', 'updated_at', 'updated_by_name'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'updated_by_name']

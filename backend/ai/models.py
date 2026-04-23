@@ -660,3 +660,147 @@ class AssignedAuditReport(models.Model):
 
     def __str__(self):
         return f"Assignment – {self.analysis_result} → {self.assigned_to}"
+
+
+class PromptTemplate(models.Model):
+    """
+    Stores system prompts used across the application.
+    Allows super-admins to fine-tune AI behavior dynamically.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    identifier = models.CharField(max_length=100, unique=True, help_text="Unique identifier used in code (e.g., 'chart_extraction')")
+    name = models.CharField(max_length=200, help_text="Human-readable name")
+    description = models.TextField(blank=True, help_text="What this prompt is used for")
+    
+    # We store the entire prompt text here. Constraints should be clearly marked or included.
+    prompt_text = models.TextField(help_text="The actual prompt text sent to the AI. Use variables like {document_text} if applicable.")
+    
+    PROMPT_GROUP_COMPLIANCE_AUDITOR = "compliance_auditor"
+    PROMPT_GROUP_CHOICES = [
+        (PROMPT_GROUP_COMPLIANCE_AUDITOR, "Compliance Auditor"),
+    ]
+
+    prompt_group = models.CharField(
+        max_length=50,
+        choices=PROMPT_GROUP_CHOICES,
+        default=PROMPT_GROUP_COMPLIANCE_AUDITOR,
+        db_index=True,
+        help_text="Logical prompt group used to select the active prompt at runtime.",
+    )
+
+    response_format = models.TextField(
+        blank=True,
+        help_text="Shared output format/schema instructions used for all prompts in the group.",
+    )
+
+    is_active = models.BooleanField(default=True)
+    is_main = models.BooleanField(default=False, help_text="Marks the default main prompt for this group.")
+    is_locked = models.BooleanField(default=False, help_text="When locked, non-superadmins can only view.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_prompts'
+    )
+
+    class Meta:
+        ordering = ["-is_main", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["prompt_group"],
+                condition=models.Q(is_active=True),
+                name="ai_prompttemplate_unique_active_per_group",
+            )
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class SuperAdminTestJob(models.Model):
+    """
+    Tracks an async AI test analysis job initiated by a super admin.
+    Accepts a raw uploaded PDF/chart instead of a patient-linked document.
+    Completely isolated from agency data.
+    """
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="superadmin_test_jobs",
+    )
+    celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
+
+    filename = models.CharField(max_length=255, blank=True)
+    file_path = models.CharField(max_length=500, blank=True)
+    extracted_text = models.TextField(blank=True)
+
+    ai_model = models.CharField(max_length=100, default="gpt-5.4")
+    prompt_id = models.UUIDField(null=True, blank=True, help_text="ID of the PromptTemplate used")
+    prompt_name = models.CharField(max_length=200, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    progress = models.PositiveSmallIntegerField(default=0)
+    error_message = models.TextField(blank=True)
+    report_status = models.CharField(
+        max_length=10,
+        choices=[("Pass", "Pass"), ("Fail", "Fail")],
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"SuperAdminTestJob {self.id} ({self.status})"
+
+
+class SuperAdminTestResult(models.Model):
+    """
+    Stores the single latest AI test result per (superadmin, status).
+    Only one 'Pass' and one 'Fail' result is kept per superadmin — old ones are replaced.
+    Completely isolated from agency AIAnalysisResult records.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="superadmin_test_results",
+    )
+
+    filename = models.CharField(max_length=255, blank=True)
+    ai_model_used = models.CharField(max_length=100, blank=True)
+    prompt_name = models.CharField(max_length=200, blank=True)
+    report_markdown = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=[("Pass", "Pass"), ("Fail", "Fail")],
+        default="Fail",
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"SuperAdminTestResult {self.id} ({self.status})"
+

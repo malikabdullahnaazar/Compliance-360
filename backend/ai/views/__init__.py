@@ -4,6 +4,8 @@ from .finding_views import ComplianceFindingViewSet
 from .ai_api_views import AIAuditAPIView
 from .report_views import ReportAnalyzeView as MistralAnalyzeView
 from .assignment_views import AssignedAuditReportView
+from .prompt_views import PromptTemplateViewSet
+from .superadmin_test_views import SuperAdminTestViewSet
 
 __all__ = [
     'AuditSessionViewSet',
@@ -12,4 +14,6 @@ __all__ = [
     'AIAuditAPIView',
     'MistralAnalyzeView',
     'AssignedAuditReportView',
+    'PromptTemplateViewSet',
+    'SuperAdminTestViewSet',
 ]

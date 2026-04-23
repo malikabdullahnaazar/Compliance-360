@@ -11,6 +11,8 @@ from .views import (
     DocumentManagementViewSet,
     MistralAnalyzeView,
     AssignedAuditReportView,
+    PromptTemplateViewSet,
+    SuperAdminTestViewSet,
 )
 
 router = DefaultRouter()
@@ -18,6 +20,7 @@ router.register(r'audit-sessions', AuditSessionViewSet, basename='audit-session'
 router.register(r'findings', ComplianceFindingViewSet, basename='finding')
 router.register(r'documents', DocumentManagementViewSet, basename='document')
 router.register(r'mistral/assignments', AssignedAuditReportView, basename='mistral-assignments')
+router.register(r'prompts', PromptTemplateViewSet, basename='prompt-template')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -50,4 +53,9 @@ urlpatterns = [
         name='mistral-assignment-analyzed-download',
     ),
     path('mistral/clinicians/', AssignedAuditReportView.as_view({'get': 'list_clinicians'}), name='mistral-clinicians'),
+    # SuperAdmin Test Analyzer endpoints
+    path('superadmin-test/start/', SuperAdminTestViewSet.as_view({'post': 'start'}), name='superadmin-test-start'),
+    path('superadmin-test/<str:job_id>/status/', SuperAdminTestViewSet.as_view({'get': 'job_status'}), name='superadmin-test-status'),
+    path('superadmin-test/results/', SuperAdminTestViewSet.as_view({'get': 'list_results'}), name='superadmin-test-results'),
+    path('superadmin-test/results/<str:result_id>/', SuperAdminTestViewSet.as_view({'get': 'get_result'}), name='superadmin-test-result-detail'),
 ]
