@@ -675,7 +675,27 @@ class PromptTemplate(models.Model):
     # We store the entire prompt text here. Constraints should be clearly marked or included.
     prompt_text = models.TextField(help_text="The actual prompt text sent to the AI. Use variables like {document_text} if applicable.")
     
+    PROMPT_GROUP_COMPLIANCE_AUDITOR = "compliance_auditor"
+    PROMPT_GROUP_CHOICES = [
+        (PROMPT_GROUP_COMPLIANCE_AUDITOR, "Compliance Auditor"),
+    ]
+
+    prompt_group = models.CharField(
+        max_length=50,
+        choices=PROMPT_GROUP_CHOICES,
+        default=PROMPT_GROUP_COMPLIANCE_AUDITOR,
+        db_index=True,
+        help_text="Logical prompt group used to select the active prompt at runtime.",
+    )
+
+    response_format = models.TextField(
+        blank=True,
+        help_text="Shared output format/schema instructions used for all prompts in the group.",
+    )
+
     is_active = models.BooleanField(default=True)
+    is_main = models.BooleanField(default=False, help_text="Marks the default main prompt for this group.")
+    is_locked = models.BooleanField(default=False, help_text="When locked, non-superadmins can only view.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
@@ -687,7 +707,14 @@ class PromptTemplate(models.Model):
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ["-is_main", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["prompt_group"],
+                condition=models.Q(is_active=True),
+                name="ai_prompttemplate_unique_active_per_group",
+            )
+        ]
 
     def __str__(self):
         return self.name

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Brain, Plus, Search, Edit2, Save, Trash2, X, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Brain, Plus, Search, Edit2, Save, Trash2, X, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Sidebar from '../components/layout/Sidebar';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
@@ -27,9 +27,19 @@ const PromptManagementPage = () => {
     try {
       const response = await promptService.getPrompts();
       // Handle standard DRF pagination or list format
-      setPrompts(response.data.results || response.data || []);
+      const raw = response.data.results || response.data || [];
+      const sorted = [...raw].sort((a, b) => {
+        if (a.is_main && !b.is_main) return -1;
+        if (!a.is_main && b.is_main) return 1;
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bTime - aTime;
+      });
+      setPrompts(sorted);
+      return sorted;
     } catch (error) {
       dispatch(addToast({ type: 'error', message: 'Failed to fetch prompts' }));
+      return [];
     } finally {
       setLoading(false);
     }
@@ -50,7 +60,7 @@ const PromptManagementPage = () => {
       name: '',
       description: '',
       prompt_text: '',
-      is_active: true
+      is_active: false
     });
     setIsEditing(true);
   };
@@ -92,6 +102,20 @@ const PromptManagementPage = () => {
       fetchPrompts();
     } catch (error) {
       dispatch(addToast({ type: 'error', message: 'Failed to delete prompt' }));
+    }
+  };
+
+  const handleActivate = async (id) => {
+    try {
+      await promptService.activatePrompt(id);
+      dispatch(addToast({ type: 'success', message: 'Prompt activated' }));
+      const updatedList = await fetchPrompts();
+      const updated = updatedList.find((p) => p.id === id);
+      if (updated) {
+        setSelectedPrompt({ ...updated, is_active: true });
+      }
+    } catch (error) {
+      dispatch(addToast({ type: 'error', message: 'Failed to activate prompt' }));
     }
   };
 
@@ -163,26 +187,91 @@ const PromptManagementPage = () => {
                     <ul className="space-y-1">
                       {filteredPrompts.map((prompt) => (
                         <li key={prompt.id}>
-                          <button
-                            onClick={() => handleSelectPrompt(prompt)}
-                            className={`w-full text-left px-3 py-3 rounded-lg transition-colors flex flex-col gap-1
-                              ${selectedPrompt?.id === prompt.id 
-                                ? 'bg-teal-50 border border-teal-200 dark:bg-teal-900/20 dark:border-teal-800/50' 
-                                : 'hover:bg-gray-50 border border-transparent dark:hover:bg-gray-800/50'
+                          <div
+                            className={`w-full px-3 py-3 rounded-lg transition-colors border
+                              ${selectedPrompt?.id === prompt.id
+                                ? 'bg-teal-50 border-teal-200 dark:bg-teal-900/20 dark:border-teal-800/50'
+                                : 'hover:bg-gray-50 border-transparent dark:hover:bg-gray-800/50'
                               }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <span className={`font-medium text-sm truncate ${selectedPrompt?.id === prompt.id ? 'text-teal-700 dark:text-teal-300' : 'text-gray-900 dark:text-white'}`}>
-                                {prompt.name}
-                              </span>
-                              {!prompt.is_active && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 font-medium">Inactive</span>
-                              )}
+                            <div className="flex items-start gap-2">
+                              <button
+                                onClick={() => handleSelectPrompt(prompt)}
+                                className="flex-1 text-left flex flex-col gap-1"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`font-medium text-sm truncate ${selectedPrompt?.id === prompt.id ? 'text-teal-700 dark:text-teal-300' : 'text-gray-900 dark:text-white'}`}>
+                                    {prompt.name}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {prompt.is_main && (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 font-medium">
+                                        Main
+                                      </span>
+                                    )}
+                                    {prompt.is_active ? (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 font-medium">
+                                        <CheckCircle className="h-3 w-3" /> Active
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 font-medium">
+                                        Inactive
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="text-xs text-gray-500 truncate" title={prompt.identifier}>
+                                  {prompt.identifier}
+                                </span>
+                              </button>
+
+                              <div className="flex items-center gap-1 pt-0.5">
+                                {!prompt.is_active && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleActivate(prompt.id);
+                                    }}
+                                    className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                                    aria-label="Activate prompt"
+                                    title="Activate"
+                                  >
+                                    <CheckCircle className="h-4 w-4 text-teal-600" />
+                                  </button>
+                                )}
+                                {!prompt.is_locked && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSelectPrompt(prompt);
+                                        setIsEditing(true);
+                                      }}
+                                      className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                                      aria-label="Edit prompt"
+                                      title="Edit"
+                                    >
+                                      <Edit2 className="h-4 w-4 text-gray-700 dark:text-gray-200" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(prompt.id);
+                                      }}
+                                      className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+                                      aria-label="Delete prompt"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <span className="text-xs text-gray-500 truncate" title={prompt.identifier}>
-                              {prompt.identifier}
-                            </span>
-                          </button>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -203,12 +292,21 @@ const PromptManagementPage = () => {
                       <div className="flex items-center gap-2">
                         {!isEditing ? (
                           <>
-                            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                              <Edit2 className="h-4 w-4 mr-1.5" /> Edit
-                            </Button>
-                            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedPrompt.id)}>
-                              <Trash2 className="h-4 w-4 mr-1.5" /> Delete
-                            </Button>
+                            {!selectedPrompt.is_active && (
+                              <Button variant="primary" size="sm" onClick={() => handleActivate(selectedPrompt.id)}>
+                                <CheckCircle className="h-4 w-4 mr-1.5" /> Activate
+                              </Button>
+                            )}
+                            {!selectedPrompt.is_locked && (
+                              <>
+                                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                                  <Edit2 className="h-4 w-4 mr-1.5" /> Edit
+                                </Button>
+                                <Button variant="danger" size="sm" onClick={() => handleDelete(selectedPrompt.id)}>
+                                  <Trash2 className="h-4 w-4 mr-1.5" /> Delete
+                                </Button>
+                              </>
+                            )}
                           </>
                         ) : (
                           <>
@@ -224,7 +322,7 @@ const PromptManagementPage = () => {
                             }}>
                               <X className="h-4 w-4 mr-1.5" /> Cancel
                             </Button>
-                            <Button variant="primary" size="sm" onClick={handleSave} disabled={isSaving}>
+                            <Button variant="primary" size="sm" onClick={handleSave} disabled={isSaving || selectedPrompt.is_locked}>
                               {isSaving ? <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />} 
                               Save Changes
                             </Button>
@@ -278,19 +376,6 @@ const PromptManagementPage = () => {
                           />
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="isActive"
-                            checked={selectedPrompt.is_active}
-                            onChange={(e) => setSelectedPrompt({...selectedPrompt, is_active: e.target.checked})}
-                            className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300 rounded"
-                          />
-                          <label htmlFor="isActive" className="text-sm text-gray-700 dark:text-gray-300">
-                            Active (Enable this prompt)
-                          </label>
-                        </div>
-
                         <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
                           <label className="flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             <span>System Prompt Text <span className="text-red-500">*</span></span>
@@ -302,7 +387,13 @@ const PromptManagementPage = () => {
                             rows={15}
                             className="w-full px-4 py-3 border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 focus:ring-teal-500 focus:border-teal-500 font-mono text-sm leading-relaxed whitespace-pre-wrap"
                             placeholder="You are an AI assistant..."
+                            disabled={selectedPrompt.is_locked}
                           />
+                          {selectedPrompt.is_locked && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              This is the main compliance prompt. You can view it but cannot edit or delete it.
+                            </p>
+                          )}
                         </div>
                       </div>
                     ) : (

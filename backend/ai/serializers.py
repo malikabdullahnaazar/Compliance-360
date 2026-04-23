@@ -297,6 +297,7 @@ class PromptTemplateSerializer(serializers.ModelSerializer):
         model = PromptTemplate
         fields = [
             'id', 'identifier', 'name', 'description', 'prompt_text',
-            'is_active', 'created_at', 'updated_at', 'updated_by_name'
+            'prompt_group', 'response_format', 'is_active', 'is_main', 'is_locked',
+            'created_at', 'updated_at', 'updated_by_name'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'updated_by_name']

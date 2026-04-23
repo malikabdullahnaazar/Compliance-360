@@ -117,9 +117,14 @@ class LangChainComplianceService:
         
         system_content = COMPLIANCE_AUDITOR_SYSTEM_PROMPT
         try:
-            template = PromptTemplate.objects.filter(identifier='compliance_auditor', is_active=True).first()
+            template = PromptTemplate.objects.filter(
+                prompt_group=PromptTemplate.PROMPT_GROUP_COMPLIANCE_AUDITOR,
+                is_active=True,
+            ).first()
             if template and template.prompt_text.strip():
                 system_content = template.prompt_text
+                if template.response_format and "## RESPONSE FORMAT" not in system_content:
+                    system_content = f"{system_content}\n\n{template.response_format}".strip()
         except Exception as e:
             logger.error(f"Error fetching PromptTemplate: {e}")
 

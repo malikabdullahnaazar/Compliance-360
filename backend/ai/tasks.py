@@ -9,7 +9,6 @@ from .services.langchain_service import get_compliance_service
 from .services.report_markdown_builder import build_compliance_report_markdown
 from .utils.report_status import report_status_from_markdown
 from .services.document_processor import get_document_processor
-from .services.patient_intake_extractor import get_patient_intake_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +132,10 @@ def _intake_update(job_id, **fields):
 
 @shared_task(bind=True, ignore_result=True)
 def run_chart_intake_job(self, job_uuid: str) -> None:
-    """Extract patient demographics from an uploaded chart (async)."""
+    """Extract chart text from an uploaded PDF (async).
+
+    Patient intake extraction was removed; this job now only performs OCR/text extraction.
+    """
     try:
         job = ChartIntakeJob.objects.select_related("created_by", "agency").get(pk=job_uuid)
     except ChartIntakeJob.DoesNotExist:
@@ -176,26 +178,12 @@ def run_chart_intake_job(self, job_uuid: str) -> None:
         if not chart_text.strip():
             raise ValueError("Could not extract text from PDF (possibly scanned/corrupted).")
 
-        extractor = get_patient_intake_extractor(model_name=(job.openai_model or "gpt-5.4-mini"))
-        _intake_update(job_uuid, progress=70)
-        extracted = extractor.extract(chart_text)
-
-        if extracted.status == "ambiguous":
-            _intake_update(
-                job_uuid,
-                status=ChartIntakeJob.STATUS_COMPLETED,
-                progress=100,
-                extracted_patient=extracted.patient,
-                ambiguous_candidates=extracted.candidates,
-                error_message="",
-            )
-            return
-
+        _intake_update(job_uuid, progress=90)
         _intake_update(
             job_uuid,
             status=ChartIntakeJob.STATUS_COMPLETED,
             progress=100,
-            extracted_patient=extracted.patient,
+            extracted_patient=None,
             ambiguous_candidates=[],
             error_message="",
         )

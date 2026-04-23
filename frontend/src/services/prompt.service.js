@@ -15,4 +15,7 @@ export const promptService = {
 
   // Delete a prompt
   deletePrompt: (id) => api.delete(`/ai/prompts/${id}/`),
+
+  // Activate a prompt (only one active at a time)
+  activatePrompt: (id) => api.post(`/ai/prompts/${id}/activate/`),
 };
