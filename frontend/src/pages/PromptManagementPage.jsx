@@ -7,6 +7,7 @@ import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { addToast } from '../store/slices/uiSlice';
 import { promptService } from '../services/prompt.service';
+import Modal from '../components/common/Modal';
 
 const PromptManagementPage = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -19,6 +20,13 @@ const PromptManagementPage = () => {
   const [selectedPrompt, setSelectedPrompt] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Modals state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [promptToDelete, setPromptToDelete] = useState(null);
+
+  const [activateModalOpen, setActivateModalOpen] = useState(false);
+  const [promptToActivate, setPromptToActivate] = useState(null);
   
   const dispatch = useDispatch();
 
@@ -91,31 +99,46 @@ const PromptManagementPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this prompt? This could break AI features relying on it.")) {
-      return;
-    }
+  const confirmDelete = (id) => {
+    setPromptToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!promptToDelete) return;
     try {
-      await promptService.deletePrompt(id);
+      await promptService.deletePrompt(promptToDelete);
       dispatch(addToast({ type: 'success', message: 'Prompt deleted' }));
       setSelectedPrompt(null);
       fetchPrompts();
     } catch (error) {
       dispatch(addToast({ type: 'error', message: 'Failed to delete prompt' }));
+    } finally {
+      setDeleteModalOpen(false);
+      setPromptToDelete(null);
     }
   };
 
-  const handleActivate = async (id) => {
+  const confirmActivate = (id) => {
+    setPromptToActivate(id);
+    setActivateModalOpen(true);
+  };
+
+  const handleActivate = async () => {
+    if (!promptToActivate) return;
     try {
-      await promptService.activatePrompt(id);
+      await promptService.activatePrompt(promptToActivate);
       dispatch(addToast({ type: 'success', message: 'Prompt activated' }));
       const updatedList = await fetchPrompts();
-      const updated = updatedList.find((p) => p.id === id);
-      if (updated) {
+      const updated = updatedList.find((p) => p.id === promptToActivate);
+      if (updated && selectedPrompt?.id === promptToActivate) {
         setSelectedPrompt({ ...updated, is_active: true });
       }
     } catch (error) {
       dispatch(addToast({ type: 'error', message: 'Failed to activate prompt' }));
+    } finally {
+      setActivateModalOpen(false);
+      setPromptToActivate(null);
     }
   };
 
@@ -231,7 +254,7 @@ const PromptManagementPage = () => {
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleActivate(prompt.id);
+                                      confirmActivate(prompt.id);
                                     }}
                                     className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                                     aria-label="Activate prompt"
@@ -259,7 +282,7 @@ const PromptManagementPage = () => {
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleDelete(prompt.id);
+                                        confirmDelete(prompt.id);
                                       }}
                                       className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
                                       aria-label="Delete prompt"
@@ -293,7 +316,7 @@ const PromptManagementPage = () => {
                         {!isEditing ? (
                           <>
                             {!selectedPrompt.is_active && (
-                              <Button variant="primary" size="sm" onClick={() => handleActivate(selectedPrompt.id)}>
+                              <Button variant="primary" size="sm" onClick={() => confirmActivate(selectedPrompt.id)}>
                                 <CheckCircle className="h-4 w-4 mr-1.5" /> Activate
                               </Button>
                             )}
@@ -302,7 +325,7 @@ const PromptManagementPage = () => {
                                 <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
                                   <Edit2 className="h-4 w-4 mr-1.5" /> Edit
                                 </Button>
-                                <Button variant="danger" size="sm" onClick={() => handleDelete(selectedPrompt.id)}>
+                                <Button variant="danger" size="sm" onClick={() => confirmDelete(selectedPrompt.id)}>
                                   <Trash2 className="h-4 w-4 mr-1.5" /> Delete
                                 </Button>
                               </>
@@ -448,10 +471,85 @@ const PromptManagementPage = () => {
               )}
             </div>
           </div>
-        </div>
       </div>
     </div>
-  );
+
+    {/* Confirmation Modals */}
+    <Modal
+      isOpen={deleteModalOpen}
+      onClose={() => {
+        setDeleteModalOpen(false);
+        setPromptToDelete(null);
+      }}
+      title={
+        <div className="flex items-center gap-2 text-sm">
+          <Trash2 className="h-4 w-4 text-gray-500" />
+          Confirm Deletion
+        </div>
+      }
+      size="sm"
+      footer={
+        <div className="flex gap-3 w-full">
+          <Button variant="outline" className="flex-1 justify-center" onClick={() => {
+            setDeleteModalOpen(false);
+            setPromptToDelete(null);
+          }}>
+            Cancel
+          </Button>
+          <Button variant="danger" className="flex-1 justify-center bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 border-transparent focus:ring-red-500" onClick={handleDelete}>
+            Delete
+          </Button>
+        </div>
+      }
+    >
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+          <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          Are you sure you want to delete this prompt?<br/><br/>This action cannot be undone and could break AI features relying on it.
+        </p>
+      </div>
+    </Modal>
+
+    <Modal
+      isOpen={activateModalOpen}
+      onClose={() => {
+        setActivateModalOpen(false);
+        setPromptToActivate(null);
+      }}
+      title={
+        <div className="flex items-center gap-2 text-sm">
+          <CheckCircle className="h-4 w-4 text-gray-500" />
+          Confirm Activation
+        </div>
+      }
+      size="sm"
+      footer={
+        <div className="flex gap-3 w-full">
+          <Button variant="outline" className="flex-1 justify-center" onClick={() => {
+            setActivateModalOpen(false);
+            setPromptToActivate(null);
+          }}>
+            Cancel
+          </Button>
+          <Button variant="primary" className="flex-1 justify-center" onClick={handleActivate}>
+            Activate
+          </Button>
+        </div>
+      }
+    >
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30">
+          <CheckCircle className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          Are you sure you want to activate this prompt?<br/><br/>It will immediately be used by the system for its designated identifier.
+        </p>
+      </div>
+    </Modal>
+  </div>
+);
 };
 
 export default PromptManagementPage;

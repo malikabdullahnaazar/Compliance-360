@@ -59,3 +59,6 @@ This is the backend for the CompliAI Chart application, built with Django.
 
 -   `core/`: Main Django project configuration.
 -   `manage.py`: Django's command-line utility for administrative tasks.
+
+Email address: superAdmin@gmail.com
+Username: superAdmin
