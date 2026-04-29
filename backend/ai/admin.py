@@ -8,7 +8,8 @@ from .models import (
     RedFlag,
     AuditRecommendation,
     AIAnalysisResult,
-    AssignedAuditReport
+    AssignedAuditReport,
+    PromptTemplate,
 )
 
 @admin.register(AuditSession)
@@ -62,3 +63,10 @@ class AssignedAuditReportAdmin(admin.ModelAdmin):
     list_display = ('analysis_result', 'assigned_to', 'status', 'assigned_at')
     list_filter = ('status',)
     search_fields = ('assigned_to__username',)
+
+@admin.register(PromptTemplate)
+class PromptTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'identifier', 'prompt_group', 'is_active', 'is_main', 'updated_at')
+    list_filter = ('is_active', 'is_main', 'prompt_group')
+    search_fields = ('name', 'identifier', 'description', 'prompt_text')
+    readonly_fields = ('created_at', 'updated_at')

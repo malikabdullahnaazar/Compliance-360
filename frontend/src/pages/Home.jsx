@@ -122,15 +122,15 @@ const Home = () => (
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6">
           <Button as={Link} to="/login" size="lg" className="bg-white text-teal-700 hover:bg-gray-50 border-0 shadow-xl hover:shadow-2xl hover:-translate-y-0.5">
-            Start Free Trial
+            Schedule Demo
           </Button>
-          <Button as={Link} to="/login" variant="outline" size="lg" className="border-2 border-white/80 text-white hover:bg-white/10 hover:border-white backdrop-blur-sm">
+          {/* <Button as={Link} to="/login" variant="outline" size="lg" className="border-2 border-white/80 text-white hover:bg-white/10 hover:border-white backdrop-blur-sm">
             View Pricing
-          </Button>
+          </Button> */}
         </div>
-        <p className="mt-8 text-sm text-teal-200">
+        {/* <p className="mt-8 text-sm text-teal-200">
           No credit card required. SOC 2, ISO 27001, GDPR, HIPAA.
-        </p>
+        </p> */}
       </div>
     </section>
   </AppChrome>
